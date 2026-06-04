@@ -1,0 +1,67 @@
+============================================
+  Hardware Specification Report (OMP variant)
+  Generated: 2026-06-05T01:20:34+08:00
+============================================
+
+==================== CPU ====================
+
+[CPU Model]
+  Intel(R) Xeon(R) Silver 4310 CPU @ 2.10GHz
+
+[CPU Topology]
+  Sockets:          1
+  Cores per Socket: 12
+  Logical CPUs:     24
+  Threads per Core: 2
+  Base clock:
+    2100.000 MHz
+
+[CPU Cache]
+  Flags:                                   fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush dts acpi mmx fxsr sse sse2 ss ht tm pbe syscall nx pdpe1gb rdtscp lm constant_tsc art arch_perfmon pebs bts rep_good nopl xtopology nonstop_tsc cpuid aperfmperf pni pclmulqdq dtes64 monitor ds_cpl vmx smx est tm2 ssse3 sdbg fma cx16 xtpr pdcm pcid dca sse4_1 sse4_2 x2apic movbe popcnt tsc_deadline_timer aes xsave avx f16c rdrand lahf_lm abm 3dnowprefetch cpuid_fault epb cat_l3 ssbd mba ibrs ibpb stibp ibrs_enhanced tpr_shadow flexpriority ept vpid ept_ad fsgsbase tsc_adjust bmi1 avx2 smep bmi2 erms invpcid cqm rdt_a avx512f avx512dq rdseed adx smap avx512ifma clflushopt clwb intel_pt avx512cd sha_ni avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves cqm_llc cqm_occup_llc cqm_mbm_total cqm_mbm_local split_lock_detect wbnoinvd dtherm ida arat pln pts vnmi avx512vbmi umip pku ospke avx512_vbmi2 gfni vaes vpclmulqdq avx512_vnni avx512_bitalg tme avx512_vpopcntdq la57 rdpid fsrm md_clear pconfig flush_l1d arch_capabilities
+  L1d cache:                               576 KiB (12 instances)
+  L1i cache:                               384 KiB (12 instances)
+  L2 cache:                                15 MiB (12 instances)
+  L3 cache:                                18 MiB (1 instance)
+
+[SIMD]
+  AVX-512 supported (512-bit)
+
+==================== Memory ====================
+  Total RAM:     188.1 GiB
+  Available RAM: 166.4 GiB
+
+[NUMA Topology]
+  available: 1 nodes (0)
+  node 0 cpus: 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23
+  node 0 size: 192581 MB
+
+==================== OpenMP ====================
+
+[Thread Count]
+  omp_get_max_threads: 24
+  omp_get_num_procs:   24
+  actual parallel threads (default): 24
+
+==================== Toolchain ====================
+
+[Compilers]
+  G++:  g++ (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0
+
+[perf]
+perf version 6.8.12
+  Available hardware events (first 15):
+
+  NOTE: If L2 events (l2_rqsts.*) are missing, find AMD/ARM equivalents
+        via: perf list | grep -i l2
+
+==================== OS ====================
+  OS:     Ubuntu 24.04.4 LTS
+  Kernel: 6.8.0-111-generic
+  Arch:   x86_64
+
+============================================
+  NOTE: Peak memory bandwidth (--peak-bw for perf_to_xml.py):
+  Run: sudo apt-get install mbw
+       mbw 512 | grep AVG | head -3
+  Or use theoretical: (memory channels × data rate × bus width / 8) GB/s
+============================================

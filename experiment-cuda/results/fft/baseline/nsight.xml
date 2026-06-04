@@ -1,0 +1,33 @@
+<Nsight_Profile>
+  <Kernel_Profile>
+    <Execution>
+      <Kernel_Name>ifft1D_512(double2 *)</Kernel_Name>
+      <Kernel_Time_ms>45.4121</Kernel_Time_ms>
+      <Grid_Size>32768</Grid_Size>
+      <Block_Size>64</Block_Size>
+    </Execution>
+    <Occupancy>
+      <Achieved>58.07%</Achieved>
+      <Theoretical_Max>58.33%</Theoretical_Max>
+      <Limiting_Factor>registers</Limiting_Factor>
+    </Occupancy>
+    <Memory>
+      <Global_Load_Throughput>12.74 GB/s</Global_Load_Throughput>
+      <Global_Store_Throughput>0.00 GB/s</Global_Store_Throughput>
+      <Shared_Memory_Throughput>0.00 GB/s</Shared_Memory_Throughput>
+      <L1_Hit_Rate>59.22%</L1_Hit_Rate>
+      <L2_Hit_Rate>64.41%</L2_Hit_Rate>
+      <DRAM_Utilization>6.63%</DRAM_Utilization>
+    </Memory>
+    <Compute>
+      <SM_Utilization>86.52%</SM_Utilization>
+      <FP32_Utilization>N/A%</FP32_Utilization>
+      <Warp_Execution_Efficiency>N/A</Warp_Execution_Efficiency>
+    </Compute>
+    <Stall_Analysis>
+      <Top_Stalls>
+        <Stall reason="unknown" percentage="N/A"/>
+      </Top_Stalls>
+    </Stall_Analysis>
+  </Kernel_Profile>
+</Nsight_Profile>

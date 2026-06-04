@@ -1,0 +1,88 @@
+<Context_Normalization>
+
+  <Problem_Classification>
+    <Domain>Machine Learning / Classification Evaluation</Domain>
+    <Algorithm>Top-K Accuracy Computation</Algorithm>
+    <Algorithm_Purpose>For each input row (prediction vector), count how many other predictions strictly exceed the ground-truth label prediction (or tie and have lower column index). If that count is within top_k, the sample is correct. Accumulate the total correct count.</Algorithm_Purpose>
+    <Algorithm_Steps>
+      1. For each row (sample), thread 0 loads the label index and label prediction value into shared memory.
+      2. All threads in the block loop over columns (strided by blockDim.x), comparing each prediction to the label prediction.
+      3. Each thread accumulates a local `ngt` count (number of predictions that beat the label).
+      4. A CUB BlockReduce sums `ngt` across all threads in the block.
+      5. Thread 0 checks if the reduced `ngt` <= top_k; if so, increments a local `count`.
+      6. After all rows are processed, thread 0 atomically adds `count` to the global accuracy counter.
+    </Algorithm_Steps>
+    <Reference_Complexity>
+      Time: O(N * D) — N rows, D columns; each element compared once per row
+      Space: O(1) additional GPU memory beyond input buffers
+    </Reference_Complexity>
+  </Problem_Classification>
+
+  <Bottleneck_Analysis>
+    <Classification>Memory-bound</Classification>
+    <Arithmetic_Intensity>
+      Each element of Xdata is read once per row pass: ~2 FLOP (comparison + conditional increment)
+      per 4 bytes loaded. Arithmetic intensity ≈ 0.5 FLOP/Byte — far below the RTX 3050's
+      ridge point (~192 GB/s / (peak FP32 ~8 TFLOPS) ≈ 42 FLOP/Byte).
+      The kernel is firmly memory-bound.
+    </Arithmetic_Intensity>
+    <Ridge_Point_Comparison>Below theoretical ridge point (0.5 vs ~42 FLOP/Byte)</Ridge_Point_Comparison>
+    <Dominant_Limiter>Global memory bandwidth — DRAM Throughput ~97% of peak in baseline kernel2</Dominant_Limiter>
+  </Bottleneck_Analysis>
+
+  <Memory_Access_Profile>
+    <Pattern>Streaming — each row of Xdata is read left-to-right, once per sample</Pattern>
+    <Read_Write_Ratio>Many-to-1 (N*D reads of Xdata, 1 atomic write to accuracy)</Read_Write_Ratio>
+    <Reuse_Factor>1 — each element read exactly once per kernel invocation</Reuse_Factor>
+    <Coalescing_Feasibility>Natural — threads access consecutive columns (threadIdx.x + k*blockDim.x), giving coalesced 128-byte transactions across the warp</Coalescing_Feasibility>
+    <Optimal_Tiling_Hint>
+      Since reuse is 1 and data far exceeds L2 (328 MB vs 1.5 MB L2), tiling into shared memory
+      yields no reuse benefit. The key optimisation is maximising memory-level parallelism (MLP)
+      via loop unrolling and issuing as many outstanding loads as possible.
+      Tile size: not applicable (streaming access). Shared memory: use only for label broadcast
+      (8 bytes per block), as already done in kernel2.
+    </Optimal_Tiling_Hint>
+  </Memory_Access_Profile>
+
+  <Parallelism_Structure>
+    <Granularity>One block processes one row at a time (grid-stride loop over rows); each thread handles ~D/blockDim.x columns per row</Granularity>
+    <Independence>Independent after reduction — rows are independent; within a row, the ngt partial sums require a BlockReduce barrier</Independence>
+    <Synchronization>__syncthreads() after shared-memory label broadcast; CUB BlockReduce (implicit __syncthreads() inside)</Synchronization>
+    <Recommended_Block_Size>
+      256 threads — matches current code. RTX 3050 has 1536 max threads/SM and 65536 registers/SM.
+      With 27 registers/thread, a block of 256 uses 6912 registers; 6 blocks fit per SM (41472 regs),
+      reaching 1536 threads/SM = 100% theoretical occupancy. Larger blocks do not increase occupancy
+      and increase register pressure.
+    </Recommended_Block_Size>
+  </Parallelism_Structure>
+
+  <Hardware_Constraints>
+    <Architecture>Ampere</Architecture>
+    <Compute_Capability>8.6</Compute_Capability>
+    <SM_Count>16</SM_Count>
+    <Max_Threads_Per_SM>1536</Max_Threads_Per_SM>
+    <Max_Threads_Per_Block>1024</Max_Threads_Per_Block>
+    <Warp_Size>32</Warp_Size>
+    <Shared_Memory_Per_Block>49152</Shared_Memory_Per_Block>
+    <Shared_Memory_Per_SM>102400</Shared_Memory_Per_SM>
+    <Registers_Per_Block>65536</Registers_Per_Block>
+    <Registers_Per_SM>65536</Registers_Per_SM>
+    <L2_Cache_Size>1572864</L2_Cache_Size>
+    <Constant_Memory>65536</Constant_Memory>
+    <Memory_Bus_Width>128</Memory_Bus_Width>
+    <Peak_Memory_Bandwidth>192.0</Peak_Memory_Bandwidth>
+    <GPU_Clock_Rate>1500</GPU_Clock_Rate>
+  </Hardware_Constraints>
+
+  <Data_Shape>
+    <Input_Dimensions>N=8192 rows, D=10000 columns, top_k=10</Input_Dimensions>
+    <Data_Type>float32 (Xdata); int32 (labelData, accuracy)</Data_Type>
+    <Total_Memory_Footprint>
+      Xdata: 8192 * 10000 * 4 = 327,680,000 bytes (~312 MB)
+      labelData: 8192 * 4 = 32,768 bytes
+      accuracy: 4 bytes
+      Total: ~312 MB
+    </Total_Memory_Footprint>
+  </Data_Shape>
+
+</Context_Normalization>

@@ -1,0 +1,67 @@
+<Iteration_Feedback round="2">
+
+  <Baseline_Kernel>
+    <Execution>
+      <Kernel_Name>accuracy_kernel(int, int, int, const float *, const int *, int *)</Kernel_Name>
+      <Kernel_Time_ms>1.8770</Kernel_Time_ms>
+      <Grid_Size>8192</Grid_Size>
+      <Block_Size>256</Block_Size>
+    </Execution>
+    <Occupancy>
+      <Achieved>98.69%</Achieved>
+      <Theoretical_Max>100%</Theoretical_Max>
+      <Limiting_Factor>block_size</Limiting_Factor>
+    </Occupancy>
+    <Memory>
+      <Global_Load_Throughput>178.58 GB/s</Global_Load_Throughput>
+      <Global_Store_Throughput>0.00 GB/s</Global_Store_Throughput>
+      <Shared_Memory_Throughput>0.00 GB/s</Shared_Memory_Throughput>
+      <L1_Hit_Rate>1.24%</L1_Hit_Rate>
+      <L2_Hit_Rate>0.19%</L2_Hit_Rate>
+      <DRAM_Utilization>84.74%</DRAM_Utilization>
+    </Memory>
+    <Compute>
+      <SM_Utilization>20.04%</SM_Utilization>
+      <FP32_Utilization>N/A%</FP32_Utilization>
+      <Warp_Execution_Efficiency>N/A</Warp_Execution_Efficiency>
+    </Compute>
+    <Stall_Analysis>
+      <Top_Stalls>
+        <Stall reason="unknown" percentage="N/A"/>
+      </Top_Stalls>
+    </Stall_Analysis>
+  </Baseline_Kernel>
+
+  <Your_Kernel>
+    <Execution>
+      <Kernel_Name>accuracy_kernel(int, int, int, const float *, const int *, int *)</Kernel_Name>
+      <Kernel_Time_ms>1.8716</Kernel_Time_ms>
+      <Grid_Size>8192</Grid_Size>
+      <Block_Size>256</Block_Size>
+    </Execution>
+    <Occupancy>
+      <Achieved>98.83%</Achieved>
+      <Theoretical_Max>100%</Theoretical_Max>
+      <Limiting_Factor>block_size</Limiting_Factor>
+    </Occupancy>
+    <Memory>
+      <Global_Load_Throughput>175.23 GB/s</Global_Load_Throughput>
+      <Global_Store_Throughput>0.00 GB/s</Global_Store_Throughput>
+      <Shared_Memory_Throughput>0.00 GB/s</Shared_Memory_Throughput>
+      <L1_Hit_Rate>1.24%</L1_Hit_Rate>
+      <L2_Hit_Rate>0.26%</L2_Hit_Rate>
+      <DRAM_Utilization>91.54%</DRAM_Utilization>
+    </Memory>
+    <Compute>
+      <SM_Utilization>22.13%</SM_Utilization>
+      <FP32_Utilization>N/A%</FP32_Utilization>
+      <Warp_Execution_Efficiency>N/A</Warp_Execution_Efficiency>
+    </Compute>
+    <Stall_Analysis>
+      <Top_Stalls>
+        <Stall reason="unknown" percentage="N/A"/>
+      </Top_Stalls>
+    </Stall_Analysis>
+  </Your_Kernel>
+
+</Iteration_Feedback>

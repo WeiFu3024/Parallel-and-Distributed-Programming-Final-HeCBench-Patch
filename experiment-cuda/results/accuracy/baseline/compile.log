@@ -1,0 +1,6 @@
+=== compile.sh | accuracy/baseline ===
+=== arch: sm_86 | 2026-06-05T03:15:24+08:00 ===
+=== nvcc: release 12.0 ===
+
+
+COMPILE: SUCCESS
