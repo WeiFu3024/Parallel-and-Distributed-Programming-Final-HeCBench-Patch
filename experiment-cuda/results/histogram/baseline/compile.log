@@ -1,0 +1,151 @@
+=== compile.sh | histogram/baseline ===
+=== arch: sm_86 | 2026-06-06T01:10:00+08:00 ===
+=== nvcc: release 13.2 ===
+
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/histogram/baseline/main.cu(123): warning #1650-D: result of call is not used
+          fread(&colormaporigin, 2, 1, fptr);
+          ^
+
+Remark: The warnings can be suppressed with "-diag-suppress <warning-number>"
+
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/histogram/baseline/main.cu(124): warning #1650-D: result of call is not used
+          fread(&colormaplength, 2, 1, fptr);
+          ^
+
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/histogram/baseline/main.cu(126): warning #1650-D: result of call is not used
+          fread(&x_origin, 2, 1, fptr);
+          ^
+
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/histogram/baseline/main.cu(127): warning #1650-D: result of call is not used
+          fread(&y_origin, 2, 1, fptr);
+          ^
+
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/histogram/baseline/main.cu(128): warning #1650-D: result of call is not used
+          fread(&width, 2, 1, fptr);
+          ^
+
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/histogram/baseline/main.cu(129): warning #1650-D: result of call is not used
+          fread(&height, 2, 1, fptr);
+          ^
+
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/histogram/baseline/main.cu(123): warning #1650-D: result of call is not used
+          fread(&colormaporigin, 2, 1, fptr);
+          ^
+
+Remark: The warnings can be suppressed with "-diag-suppress <warning-number>"
+
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/histogram/baseline/main.cu(124): warning #1650-D: result of call is not used
+          fread(&colormaplength, 2, 1, fptr);
+          ^
+
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/histogram/baseline/main.cu(126): warning #1650-D: result of call is not used
+          fread(&x_origin, 2, 1, fptr);
+          ^
+
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/histogram/baseline/main.cu(127): warning #1650-D: result of call is not used
+          fread(&y_origin, 2, 1, fptr);
+          ^
+
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/histogram/baseline/main.cu(128): warning #1650-D: result of call is not used
+          fread(&width, 2, 1, fptr);
+          ^
+
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/histogram/baseline/main.cu(129): warning #1650-D: result of call is not used
+          fread(&height, 2, 1, fptr);
+          ^
+
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/histogram/baseline/mersenne.h: In function ‘void mersenne::init_genrand(unsigned int)’:
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/histogram/baseline/mersenne.h:62:19: warning: comparison of integer expressions of different signedness: ‘int’ and ‘const unsigned int’ [-Wsign-compare]
+   62 |     for (mti = 1; mti < N; mti++)
+      |               ~~~~^~~
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/histogram/baseline/mersenne.h: In function ‘void mersenne::init_by_array(unsigned int*, int)’:
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/histogram/baseline/mersenne.h:86:9: warning: comparison of integer expressions of different signedness: ‘const unsigned int’ and ‘int’ [-Wsign-compare]
+   86 |     k = (N > key_length ? N : key_length);
+      |       ~~^~~~~~~~~~~~
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/histogram/baseline/mersenne.h:94:7: warning: comparison of integer expressions of different signedness: ‘int’ and ‘const unsigned int’ [-Wsign-compare]
+   94 |         if (i >= N)
+      |       ^ ~~
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/histogram/baseline/mersenne.h:106:7: warning: comparison of integer expressions of different signedness: ‘int’ and ‘const unsigned int’ [-Wsign-compare]
+  106 |         if (i >= N)
+      |       ^ ~~
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/histogram/baseline/mersenne.h: In function ‘unsigned int mersenne::genrand_int32()’:
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/histogram/baseline/mersenne.h:124:9: warning: comparison of integer expressions of different signedness: ‘int’ and ‘const unsigned int’ [-Wsign-compare]
+  124 |     if (mti >= N)
+      |     ~~~~^~~~
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/histogram/baseline/mersenne.h:131:17: warning: comparison of integer expressions of different signedness: ‘int’ and ‘unsigned int’ [-Wsign-compare]
+  131 |         for (kk = 0; kk < N - M; kk++)
+      |              ~~~^~~~~~~~~
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/histogram/baseline/mersenne.h:136:11: warning: comparison of integer expressions of different signedness: ‘int’ and ‘unsigned int’ [-Wsign-compare]
+  136 |         for (; kk < N - 1; kk++)
+      |         ~~^~~~~~~~~~~
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/histogram/baseline/test_util.h: In function ‘bool IsNaN(T) [with T = float]’:
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/histogram/baseline/test_util.h:314:56: warning: dereferencing type-punned pointer will break strict-aliasing rules [-Wstrict-aliasing]
+  314 |     volatile unsigned int bits = reinterpret_cast<unsigned int &>(val);
+      |                                                        ^~~
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/histogram/baseline/test_util.h: In function ‘bool IsNaN(T) [with T = double]’:
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/histogram/baseline/test_util.h:349:38: warning: dereferencing type-punned pointer will break strict-aliasing rules [-Wstrict-aliasing]
+  349 |     volatile unsigned long long bits = *reinterpret_cast<unsigned long long *>(&val);
+      |                                     ~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/histogram/baseline/test_util.h: At global scope:
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/histogram/baseline/test_util.h:376:24: warning: ‘double4’ is deprecated: use double4_16a or double4_32a [-Wdeprecated-declarations]
+  376 |  bool IsNaN<double4>(double4 val)
+      |                        ^~~~~~~
+In file included from /usr/local/cuda-13.2/targets/x86_64-linux/include/driver_types.h:61,
+                 from /usr/local/cuda/bin/../targets/x86_64-linux/include/builtin_types.h:59,
+                 from /usr/local/cuda/bin/../targets/x86_64-linux/include/crt/host_runtime.h:58,
+                 from /usr/lib/gcc/x86_64-linux-gnu/13/include/stddef.h:218:
+/usr/local/cuda-13.2/targets/x86_64-linux/include/vector_types.h:564:104: note: declared here
+  564 | typedef __device_builtin__ struct double4 __VECTOR_TYPE_DEPRECATED__("use double4_16a or double4_32a") double4;
+      |                                                                                                        ^~~~~~~
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/histogram/baseline/test_util.h:376:45: warning: ‘double4’ is deprecated: use double4_16a or double4_32a [-Wdeprecated-declarations]
+  376 |  bool IsNaN<double4>(double4 val)
+      |                                             ^
+/usr/local/cuda-13.2/targets/x86_64-linux/include/vector_types.h:477:42: note: declared here
+  477 | __device_builtin__ __builtin_align__(16) double4
+      |                                          ^~~~~~~
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/histogram/baseline/main.cu: In function ‘void ReadTga(uchar4*&, int&, int&, const char*)’:
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/histogram/baseline/main.cu:242:44: warning: comparison of integer expressions of different signedness: ‘size_t’ {aka ‘long unsigned int’} and ‘int’ [-Wsign-compare]
+  242 |             if (fread(tga_pixel, 1, pixel_bytes, fptr) != pixel_bytes)
+      |             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/histogram/baseline/main.cu:253:48: warning: comparison of integer expressions of different signedness: ‘size_t’ {aka ‘long unsigned int’} and ‘int’ [-Wsign-compare]
+  253 |             if (fread(tga_pixel, 1, pixel_bytes + 1, fptr) != pixel_bytes + 1)
+      |             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/histogram/baseline/main.cu:276:44: warning: comparison of integer expressions of different signedness: ‘size_t’ {aka ‘long unsigned int’} and ‘int’ [-Wsign-compare]
+  276 |                     if (fread(tga_pixel, 1, pixel_bytes, fptr) != pixel_bytes)
+      |                     ~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/histogram/baseline/main.cu: In function ‘int main(int, char**)’:
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/histogram/baseline/main.cu:649:19: warning: comparison of integer expressions of different signedness: ‘int’ and ‘std::vector<std::__cxx11::basic_string<char> >::size_type’ {aka ‘long unsigned int’} [-Wsign-compare]
+  649 |         for (int i = 0; i < file_tests.size(); ++i)
+      |                 ~~^~~~~~~~~~~~~~~~~~~
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/histogram/baseline/main.cu: In instantiation of ‘void TestMethods(PixelType*, int, int, int, double) [with int NUM_CHANNELS = 1; int ACTIVE_CHANNELS = 1; int NUM_BINS = 256; PixelType = uchar1]’:
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/histogram/baseline/main.cu:522:25:   required from here
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/histogram/baseline/main.cu:480:19: warning: comparison of integer expressions of different signedness: ‘int’ and ‘std::vector<std::pair<std::__cxx11::basic_string<char>, double> >::size_type’ {aka ‘long unsigned int’} [-Wsign-compare]
+  480 |         for (int i = 0; i < timings.size(); i++)
+      |                 ~~^~~~~~~~~~~~~~~~
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/histogram/baseline/main.cu: In instantiation of ‘void TestMethods(PixelType*, int, int, int, double) [with int NUM_CHANNELS = 4; int ACTIVE_CHANNELS = 3; int NUM_BINS = 256; PixelType = uchar4]’:
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/histogram/baseline/main.cu:529:25:   required from here
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/histogram/baseline/main.cu:480:19: warning: comparison of integer expressions of different signedness: ‘int’ and ‘std::vector<std::pair<std::__cxx11::basic_string<char>, double> >::size_type’ {aka ‘long unsigned int’} [-Wsign-compare]
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/histogram/baseline/main.cu: In instantiation of ‘void TestMethods(PixelType*, int, int, int, double) [with int NUM_CHANNELS = 4; int ACTIVE_CHANNELS = 3; int NUM_BINS = 256; PixelType = float4]’:
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/histogram/baseline/main.cu:546:25:   required from here
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/histogram/baseline/main.cu:480:19: warning: comparison of integer expressions of different signedness: ‘int’ and ‘std::vector<std::pair<std::__cxx11::basic_string<char>, double> >::size_type’ {aka ‘long unsigned int’} [-Wsign-compare]
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/histogram/baseline/main.cu: In member function ‘void TgaHeader::Parse(FILE*)’:
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/histogram/baseline/main.cu:123:6: warning: ignoring return value of ‘size_t fread(void*, size_t, size_t, FILE*)’ declared with attribute ‘warn_unused_result’ [-Wunused-result]
+  123 |         fread(&colormaporigin, 2, 1, fptr);
+      |      ^  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/histogram/baseline/main.cu:124:6: warning: ignoring return value of ‘size_t fread(void*, size_t, size_t, FILE*)’ declared with attribute ‘warn_unused_result’ [-Wunused-result]
+  124 |         fread(&colormaplength, 2, 1, fptr);
+      |      ^  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/histogram/baseline/main.cu:126:6: warning: ignoring return value of ‘size_t fread(void*, size_t, size_t, FILE*)’ declared with attribute ‘warn_unused_result’ [-Wunused-result]
+  126 |         fread(&x_origin, 2, 1, fptr);
+      |      ^  ~~~~~~~~~~~~~~~~~~~~~~
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/histogram/baseline/main.cu:127:6: warning: ignoring return value of ‘size_t fread(void*, size_t, size_t, FILE*)’ declared with attribute ‘warn_unused_result’ [-Wunused-result]
+  127 |         fread(&y_origin, 2, 1, fptr);
+      |      ^  ~~~~~~~~~~~~~~~~~~~~~~
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/histogram/baseline/main.cu:128:6: warning: ignoring return value of ‘size_t fread(void*, size_t, size_t, FILE*)’ declared with attribute ‘warn_unused_result’ [-Wunused-result]
+  128 |         fread(&width, 2, 1, fptr);
+      |      ^  ~~~~~~~~~~~~~~~~~~~
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/histogram/baseline/main.cu:129:6: warning: ignoring return value of ‘size_t fread(void*, size_t, size_t, FILE*)’ declared with attribute ‘warn_unused_result’ [-Wunused-result]
+  129 |         fread(&height, 2, 1, fptr);
+      |      ^  ~~~~~~~~~~~~~~~~~~~~
+
+COMPILE: SUCCESS

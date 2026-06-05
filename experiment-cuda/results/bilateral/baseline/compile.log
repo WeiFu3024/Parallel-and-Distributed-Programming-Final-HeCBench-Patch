@@ -1,0 +1,12 @@
+=== compile.sh | bilateral/baseline ===
+=== arch: sm_86 | 2026-06-06T01:09:34+08:00 ===
+=== nvcc: release 13.2 ===
+
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/bilateral/baseline/reference.h:22: warning: ignoring ‘#pragma unroll ’ [-Wunknown-pragmas]
+   22 |       for(int i = -R; i <= R; i++)
+      | 
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/bilateral/baseline/reference.h:24: warning: ignoring ‘#pragma unroll ’ [-Wunknown-pragmas]
+   24 |         for(int j = -R; j <= R; j++) {
+      | 
+
+COMPILE: SUCCESS

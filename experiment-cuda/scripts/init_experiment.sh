@@ -9,7 +9,7 @@
 #
 # This will:
 #   1. Create experiment-cuda/results/{benchmark}/ with baseline/cell_a/cell_b/cell_c dirs
-#   2. Copy the original .cu file from HeCBench src/{bench}-cuda/ into baseline/
+#   2. Copy the original .cu file from HeCBench src/{bench}-cuda/ into baseline/ as main.cu
 #   3. Create round and attempt subdirectories
 
 set -euo pipefail
@@ -26,7 +26,6 @@ fi
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 EXPERIMENT_DIR="${SCRIPT_DIR}/.."
 
-# Create top-level config directory (scripts dir already exists)
 mkdir -p "${EXPERIMENT_DIR}/config"
 
 echo "Creating experiment structure at ${EXPERIMENT_DIR}/"
@@ -35,30 +34,52 @@ for bench in "${BENCHMARKS[@]}"; do
   echo "  Setting up benchmark: ${bench}"
 
   BASE="${EXPERIMENT_DIR}/results/${bench}"
-
-  # Baseline
   mkdir -p "${BASE}/baseline"
 
-  # Find and copy the original CUDA source
-  CUDA_SRC="${HECBENCH_PATH}/src/${bench}-cuda/main.cu"
-  if [ -f "${CUDA_SRC}" ]; then
-    cp "${CUDA_SRC}" "${BASE}/baseline/main.cu"
-    echo "    Copied baseline from ${CUDA_SRC}"
+  # --- Map benchmark name → HeCBench source directory ---
+  # Most benchmarks follow the pattern ${bench}-cuda; exceptions listed here.
+  case "${bench}" in
+    transpose) BENCH_SRC_DIR="${HECBENCH_PATH}/src/matrixT-cuda" ;;
+    *)         BENCH_SRC_DIR="${HECBENCH_PATH}/src/${bench}-cuda" ;;
+  esac
+
+  # --- Map benchmark name → actual main source filename ---
+  # Most use main.cu; fall back to ${bench}.cu; explicit overrides below.
+  case "${bench}" in
+    black-scholes) BENCH_SRC_FILE="blackScholesAnalyticEngine.cu" ;;
+    histogram)     BENCH_SRC_FILE="histogram_compare.cu" ;;
+    hotspot)       BENCH_SRC_FILE="hotspot.cu" ;;
+    *)             BENCH_SRC_FILE="" ;;  # will try main.cu then ${bench}.cu
+  esac
+
+  # --- Find and copy baseline source (always stored as main.cu) ---
+  if [ -n "${BENCH_SRC_FILE}" ]; then
+    CUDA_SRC="${BENCH_SRC_DIR}/${BENCH_SRC_FILE}"
+    if [ -f "${CUDA_SRC}" ]; then
+      cp "${CUDA_SRC}" "${BASE}/baseline/main.cu"
+      echo "    Copied baseline from ${CUDA_SRC} (renamed to main.cu)"
+    else
+      echo "    WARNING: ${CUDA_SRC} not found. Skipping baseline copy."
+    fi
   else
-    echo "    WARNING: ${CUDA_SRC} not found. Skipping baseline copy."
+    CUDA_SRC="${BENCH_SRC_DIR}/main.cu"
+    CUDA_SRC_ALT="${BENCH_SRC_DIR}/${bench}.cu"
+    if [ -f "${CUDA_SRC}" ]; then
+      cp "${CUDA_SRC}" "${BASE}/baseline/main.cu"
+      echo "    Copied baseline from ${CUDA_SRC}"
+    elif [ -f "${CUDA_SRC_ALT}" ]; then
+      cp "${CUDA_SRC_ALT}" "${BASE}/baseline/main.cu"
+      echo "    Copied baseline from ${CUDA_SRC_ALT} (renamed to main.cu)"
+    else
+      echo "    WARNING: No source file found in ${BENCH_SRC_DIR}/. Skipping baseline copy."
+    fi
   fi
 
-  # Cell A: 1 round, up to 3 attempts
+  # --- Create cell subdirectories ---
   for attempt in 1 2 3; do
     mkdir -p "${BASE}/cell_a/round_1/attempt_${attempt}"
-  done
-
-  # Cell B: 1 round, up to 3 attempts
-  for attempt in 1 2 3; do
     mkdir -p "${BASE}/cell_b/round_1/attempt_${attempt}"
   done
-
-  # Cell C: 3 rounds, each up to 3 attempts
   for round in 1 2 3; do
     for attempt in 1 2 3; do
       mkdir -p "${BASE}/cell_c/round_${round}/attempt_${attempt}"

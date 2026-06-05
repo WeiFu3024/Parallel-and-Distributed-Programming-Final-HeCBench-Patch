@@ -1,0 +1,289 @@
+=== compile.sh | fluidSim/baseline ===
+=== arch: sm_86 | 2026-06-06T01:09:52+08:00 ===
+=== nvcc: release 13.2 ===
+
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/fluidSim/baseline/main.cu: In function ‘int main(int, char**)’:
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/fluidSim/baseline/main.cu:33:44: warning: ‘double4’ is deprecated: use double4_16a or double4_32a [-Wdeprecated-declarations]
+   33 |   double *h_if1234 = (double*)malloc(sizeof(double4) * temp);
+      |                                            ^~~~~~~
+In file included from /usr/local/cuda-13.2/targets/x86_64-linux/include/driver_types.h:61,
+                 from /usr/local/cuda/bin/../targets/x86_64-linux/include/builtin_types.h:59,
+                 from /usr/local/cuda/bin/../targets/x86_64-linux/include/crt/host_runtime.h:58,
+                 from /usr/lib/gcc/x86_64-linux-gnu/13/include/stddef.h:218:
+/usr/local/cuda-13.2/targets/x86_64-linux/include/vector_types.h:564:104: note: declared here
+  564 | typedef __device_builtin__ struct double4 __VECTOR_TYPE_DEPRECATED__("use double4_16a or double4_32a") double4;
+      |                                                                                                        ^~~~~~~
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/fluidSim/baseline/main.cu:34:44: warning: ‘double4’ is deprecated: use double4_16a or double4_32a [-Wdeprecated-declarations]
+   34 |   double *h_if5678 = (double*)malloc(sizeof(double4) * temp);
+      |                                            ^~~~~~~
+/usr/local/cuda-13.2/targets/x86_64-linux/include/vector_types.h:564:104: note: declared here
+  564 | typedef __device_builtin__ struct double4 __VECTOR_TYPE_DEPRECATED__("use double4_16a or double4_32a") double4;
+      |                                                                                                        ^~~~~~~
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/fluidSim/baseline/main.cu:45:44: warning: ‘double4’ is deprecated: use double4_16a or double4_32a [-Wdeprecated-declarations]
+   45 |   double *h_of1234 = (double*)malloc(sizeof(double4) * temp);
+      |                                            ^~~~~~~
+/usr/local/cuda-13.2/targets/x86_64-linux/include/vector_types.h:564:104: note: declared here
+  564 | typedef __device_builtin__ struct double4 __VECTOR_TYPE_DEPRECATED__("use double4_16a or double4_32a") double4;
+      |                                                                                                        ^~~~~~~
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/fluidSim/baseline/main.cu:46:44: warning: ‘double4’ is deprecated: use double4_16a or double4_32a [-Wdeprecated-declarations]
+   46 |   double *h_of5678 = (double*)malloc(sizeof(double4) * temp);
+      |                                            ^~~~~~~
+/usr/local/cuda-13.2/targets/x86_64-linux/include/vector_types.h:564:104: note: declared here
+  564 | typedef __device_builtin__ struct double4 __VECTOR_TYPE_DEPRECATED__("use double4_16a or double4_32a") double4;
+      |                                                                                                        ^~~~~~~
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/fluidSim/baseline/kernels.cu(87): warning #1444-D: type "double4" was declared deprecated ("use double4_16a or double4_32a")
+    double4 f1234 = if1234[pos];
+            ^
+/usr/local/cuda/bin/../targets/x86_64-linux/include/vector_types.h(564): note #3287-D: because of a "deprecated" attribute
+  typedef __attribute__((device_builtin)) struct double4 __attribute__((deprecated("use double4_16a or double4_32a"))) double4;
+                                                                        ^
+
+Remark: The warnings can be suppressed with "-diag-suppress <warning-number>"
+
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/fluidSim/baseline/kernels.cu(88): warning #1444-D: type "double4" was declared deprecated ("use double4_16a or double4_32a")
+    double4 f5678 = if5678[pos];
+            ^
+/usr/local/cuda/bin/../targets/x86_64-linux/include/vector_types.h(564): note #3287-D: because of a "deprecated" attribute
+  typedef __attribute__((device_builtin)) struct double4 __attribute__((deprecated("use double4_16a or double4_32a"))) double4;
+                                                                        ^
+
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/fluidSim/baseline/kernels.cu(92): warning #1444-D: type "double4" was declared deprecated ("use double4_16a or double4_32a")
+    double4 e1234;
+            ^
+/usr/local/cuda/bin/../targets/x86_64-linux/include/vector_types.h(564): note #3287-D: because of a "deprecated" attribute
+  typedef __attribute__((device_builtin)) struct double4 __attribute__((deprecated("use double4_16a or double4_32a"))) double4;
+                                                                        ^
+
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/fluidSim/baseline/kernels.cu(93): warning #1444-D: type "double4" was declared deprecated ("use double4_16a or double4_32a")
+    double4 e5678;
+            ^
+/usr/local/cuda/bin/../targets/x86_64-linux/include/vector_types.h(564): note #3287-D: because of a "deprecated" attribute
+  typedef __attribute__((device_builtin)) struct double4 __attribute__((deprecated("use double4_16a or double4_32a"))) double4;
+                                                                        ^
+
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/fluidSim/baseline/kernels.cu(123): warning #1444-D: type "double4" was declared deprecated ("use double4_16a or double4_32a")
+      double4 temp = f1234 + f5678;
+              ^
+/usr/local/cuda/bin/../targets/x86_64-linux/include/vector_types.h(564): note #3287-D: because of a "deprecated" attribute
+  typedef __attribute__((device_builtin)) struct double4 __attribute__((deprecated("use double4_16a or double4_32a"))) double4;
+                                                                        ^
+
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/fluidSim/baseline/kernels.cu(127): warning #1444-D: type "double4" was declared deprecated ("use double4_16a or double4_32a")
+      double4 x1234 = make_double4(dirX.s0, dirX.s1, dirX.s2, dirX.s3);
+              ^
+/usr/local/cuda/bin/../targets/x86_64-linux/include/vector_types.h(564): note #3287-D: because of a "deprecated" attribute
+  typedef __attribute__((device_builtin)) struct double4 __attribute__((deprecated("use double4_16a or double4_32a"))) double4;
+                                                                        ^
+
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/fluidSim/baseline/kernels.cu(128): warning #1444-D: type "double4" was declared deprecated ("use double4_16a or double4_32a")
+      double4 x5678 = make_double4(dirX.s4, dirX.s5, dirX.s6, dirX.s7);
+              ^
+/usr/local/cuda/bin/../targets/x86_64-linux/include/vector_types.h(564): note #3287-D: because of a "deprecated" attribute
+  typedef __attribute__((device_builtin)) struct double4 __attribute__((deprecated("use double4_16a or double4_32a"))) double4;
+                                                                        ^
+
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/fluidSim/baseline/kernels.cu(129): warning #1444-D: type "double4" was declared deprecated ("use double4_16a or double4_32a")
+      double4 y1234 = make_double4(dirY.s0, dirY.s1, dirY.s2, dirY.s3);
+              ^
+/usr/local/cuda/bin/../targets/x86_64-linux/include/vector_types.h(564): note #3287-D: because of a "deprecated" attribute
+  typedef __attribute__((device_builtin)) struct double4 __attribute__((deprecated("use double4_16a or double4_32a"))) double4;
+                                                                        ^
+
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/fluidSim/baseline/kernels.cu(130): warning #1444-D: type "double4" was declared deprecated ("use double4_16a or double4_32a")
+      double4 y5678 = make_double4(dirY.s4, dirY.s5, dirY.s6, dirY.s7);
+              ^
+/usr/local/cuda/bin/../targets/x86_64-linux/include/vector_types.h(564): note #3287-D: because of a "deprecated" attribute
+  typedef __attribute__((device_builtin)) struct double4 __attribute__((deprecated("use double4_16a or double4_32a"))) double4;
+                                                                        ^
+
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/fluidSim/baseline/kernels.cu:8:65: warning: ‘double4’ is deprecated: use double4_16a or double4_32a [-Wdeprecated-declarations]
+    8 | inline __device__ double dot (double4 &a, double4 &b)
+      |                                                                 ^
+In file included from /usr/local/cuda-13.2/targets/x86_64-linux/include/driver_types.h:61,
+                 from /usr/local/cuda/bin/../targets/x86_64-linux/include/builtin_types.h:59,
+                 from /usr/local/cuda/bin/../targets/x86_64-linux/include/crt/host_runtime.h:58,
+                 from /usr/lib/gcc/x86_64-linux-gnu/13/include/stddef.h:218:
+/usr/local/cuda-13.2/targets/x86_64-linux/include/vector_types.h:477:42: note: declared here
+  477 | __device_builtin__ __builtin_align__(16) double4
+      |                                          ^~~~~~~
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/fluidSim/baseline/kernels.cu:8:65: warning: ‘double4’ is deprecated: use double4_16a or double4_32a [-Wdeprecated-declarations]
+    8 | inline __device__ double dot (double4 &a, double4 &b)
+      |                                                                 ^
+/usr/local/cuda-13.2/targets/x86_64-linux/include/vector_types.h:477:42: note: declared here
+  477 | __device_builtin__ __builtin_align__(16) double4
+      |                                          ^~~~~~~
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/fluidSim/baseline/kernels.cu:13:70: warning: ‘double4’ is deprecated: use double4_16a or double4_32a [-Wdeprecated-declarations]
+   13 | inline __device__ double4 operator+(double4 a, double4 b)
+      |                                                                      ^
+/usr/local/cuda-13.2/targets/x86_64-linux/include/vector_types.h:564:104: note: declared here
+  564 | typedef __device_builtin__ struct double4 __VECTOR_TYPE_DEPRECATED__("use double4_16a or double4_32a") double4;
+      |                                                                                                        ^~~~~~~
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/fluidSim/baseline/kernels.cu:13:70: warning: ‘double4’ is deprecated: use double4_16a or double4_32a [-Wdeprecated-declarations]
+   13 | inline __device__ double4 operator+(double4 a, double4 b)
+      |                                                                      ^
+/usr/local/cuda-13.2/targets/x86_64-linux/include/vector_types.h:477:42: note: declared here
+  477 | __device_builtin__ __builtin_align__(16) double4
+      |                                          ^~~~~~~
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/fluidSim/baseline/kernels.cu:13:70: warning: ‘double4’ is deprecated: use double4_16a or double4_32a [-Wdeprecated-declarations]
+   13 | inline __device__ double4 operator+(double4 a, double4 b)
+      |                                                                      ^
+/usr/local/cuda-13.2/targets/x86_64-linux/include/vector_types.h:477:42: note: declared here
+  477 | __device_builtin__ __builtin_align__(16) double4
+      |                                          ^~~~~~~
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/fluidSim/baseline/kernels.cu:18:69: warning: ‘double4’ is deprecated: use double4_16a or double4_32a [-Wdeprecated-declarations]
+   18 | inline __device__ double4 operator*(double b, double4 a)
+      |                                                                     ^
+/usr/local/cuda-13.2/targets/x86_64-linux/include/vector_types.h:564:104: note: declared here
+  564 | typedef __device_builtin__ struct double4 __VECTOR_TYPE_DEPRECATED__("use double4_16a or double4_32a") double4;
+      |                                                                                                        ^~~~~~~
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/fluidSim/baseline/kernels.cu:18:69: warning: ‘double4’ is deprecated: use double4_16a or double4_32a [-Wdeprecated-declarations]
+   18 | inline __device__ double4 operator*(double b, double4 a)
+      |                                                                     ^
+/usr/local/cuda-13.2/targets/x86_64-linux/include/vector_types.h:477:42: note: declared here
+  477 | __device_builtin__ __builtin_align__(16) double4
+      |                                          ^~~~~~~
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/fluidSim/baseline/kernels.cu:77:6: warning: ‘double4’ is deprecated: use double4_16a or double4_32a [-Wdeprecated-declarations]
+   77 |     double omega)
+      |      ^
+/usr/local/cuda-13.2/targets/x86_64-linux/include/vector_types.h:477:42: note: declared here
+  477 | __device_builtin__ __builtin_align__(16) double4
+      |                                          ^~~~~~~
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/fluidSim/baseline/kernels.cu:77:6: warning: ‘double4’ is deprecated: use double4_16a or double4_32a [-Wdeprecated-declarations]
+   77 |     double omega)
+      |      ^
+/usr/local/cuda-13.2/targets/x86_64-linux/include/vector_types.h:477:42: note: declared here
+  477 | __device_builtin__ __builtin_align__(16) double4
+      |                                          ^~~~~~~
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/fluidSim/baseline/kernels.cu:77:6: warning: ‘double4’ is deprecated: use double4_16a or double4_32a [-Wdeprecated-declarations]
+   77 |     double omega)
+      |      ^
+/usr/local/cuda-13.2/targets/x86_64-linux/include/vector_types.h:477:42: note: declared here
+  477 | __device_builtin__ __builtin_align__(16) double4
+      |                                          ^~~~~~~
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/fluidSim/baseline/kernels.cu:77:6: warning: ‘double4’ is deprecated: use double4_16a or double4_32a [-Wdeprecated-declarations]
+   77 |     double omega)
+      |      ^
+/usr/local/cuda-13.2/targets/x86_64-linux/include/vector_types.h:477:42: note: declared here
+  477 | __device_builtin__ __builtin_align__(16) double4
+      |                                          ^~~~~~~
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/fluidSim/baseline/kernels.cu: In function ‘void fluidSim(int, double, const int*, const bool*, double2*, double*, double8, double8, const double*, double*, double*, double*, double*, double*, double*)’:
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/fluidSim/baseline/kernels.cu:211:53: warning: ‘double4’ is deprecated: use double4_16a or double4_32a [-Wdeprecated-declarations]
+  211 |   size_t dbl4_size = dims[0] * dims[1] * sizeof(double4);
+      |                                                     ^~~~~  
+/usr/local/cuda-13.2/targets/x86_64-linux/include/vector_types.h:564:104: note: declared here
+  564 | typedef __device_builtin__ struct double4 __VECTOR_TYPE_DEPRECATED__("use double4_16a or double4_32a") double4;
+      |                                                                                                        ^~~~~~~
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/fluidSim/baseline/kernels.cu:216:10: warning: ‘double4’ is deprecated: use double4_16a or double4_32a [-Wdeprecated-declarations]
+  216 |   double4 *d_if1234, *d_if5678;
+      |          ^~~~~~~~
+/usr/local/cuda-13.2/targets/x86_64-linux/include/vector_types.h:564:104: note: declared here
+  564 | typedef __device_builtin__ struct double4 __VECTOR_TYPE_DEPRECATED__("use double4_16a or double4_32a") double4;
+      |                                                                                                        ^~~~~~~
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/fluidSim/baseline/kernels.cu:216:21: warning: ‘double4’ is deprecated: use double4_16a or double4_32a [-Wdeprecated-declarations]
+  216 |   double4 *d_if1234, *d_if5678;
+      |                     ^~~~~~~~
+/usr/local/cuda-13.2/targets/x86_64-linux/include/vector_types.h:564:104: note: declared here
+  564 | typedef __device_builtin__ struct double4 __VECTOR_TYPE_DEPRECATED__("use double4_16a or double4_32a") double4;
+      |                                                                                                        ^~~~~~~
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/fluidSim/baseline/kernels.cu:217:10: warning: ‘double4’ is deprecated: use double4_16a or double4_32a [-Wdeprecated-declarations]
+  217 |   double4 *d_of1234, *d_of5678;
+      |          ^~~~~~~~
+/usr/local/cuda-13.2/targets/x86_64-linux/include/vector_types.h:564:104: note: declared here
+  564 | typedef __device_builtin__ struct double4 __VECTOR_TYPE_DEPRECATED__("use double4_16a or double4_32a") double4;
+      |                                                                                                        ^~~~~~~
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/fluidSim/baseline/kernels.cu:217:21: warning: ‘double4’ is deprecated: use double4_16a or double4_32a [-Wdeprecated-declarations]
+  217 |   double4 *d_of1234, *d_of5678;
+      |                     ^~~~~~~~
+/usr/local/cuda-13.2/targets/x86_64-linux/include/vector_types.h:564:104: note: declared here
+  564 | typedef __device_builtin__ struct double4 __VECTOR_TYPE_DEPRECATED__("use double4_16a or double4_32a") double4;
+      |                                                                                                        ^~~~~~~
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/fluidSim/baseline/kernels.cu:228:31: warning: ‘double4’ is deprecated: use double4_16a or double4_32a [-Wdeprecated-declarations]
+  228 |   cudaMemcpy(d_if1234, (double4*)h_if1234, dbl4_size, cudaMemcpyHostToDevice);
+      |                               ^
+/usr/local/cuda-13.2/targets/x86_64-linux/include/vector_types.h:564:104: note: declared here
+  564 | typedef __device_builtin__ struct double4 __VECTOR_TYPE_DEPRECATED__("use double4_16a or double4_32a") double4;
+      |                                                                                                        ^~~~~~~
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/fluidSim/baseline/kernels.cu:229:31: warning: ‘double4’ is deprecated: use double4_16a or double4_32a [-Wdeprecated-declarations]
+  229 |   cudaMemcpy(d_if5678, (double4*)h_if5678, dbl4_size, cudaMemcpyHostToDevice);
+      |                               ^
+/usr/local/cuda-13.2/targets/x86_64-linux/include/vector_types.h:564:104: note: declared here
+  564 | typedef __device_builtin__ struct double4 __VECTOR_TYPE_DEPRECATED__("use double4_16a or double4_32a") double4;
+      |                                                                                                        ^~~~~~~
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/fluidSim/baseline/kernels.cu:258:10: warning: ‘double4’ is deprecated: use double4_16a or double4_32a [-Wdeprecated-declarations]
+  258 |     double4 *temp1234 = d_of1234;
+      |          ^~~~~~~~
+/usr/local/cuda-13.2/targets/x86_64-linux/include/vector_types.h:564:104: note: declared here
+  564 | typedef __device_builtin__ struct double4 __VECTOR_TYPE_DEPRECATED__("use double4_16a or double4_32a") double4;
+      |                                                                                                        ^~~~~~~
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/fluidSim/baseline/kernels.cu:259:10: warning: ‘double4’ is deprecated: use double4_16a or double4_32a [-Wdeprecated-declarations]
+  259 |     double4 *temp5678 = d_of5678;
+      |          ^~~~~~~~
+/usr/local/cuda-13.2/targets/x86_64-linux/include/vector_types.h:564:104: note: declared here
+  564 | typedef __device_builtin__ struct double4 __VECTOR_TYPE_DEPRECATED__("use double4_16a or double4_32a") double4;
+      |                                                                                                        ^~~~~~~
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/fluidSim/baseline/kernels.cu:276:21: warning: ‘double4’ is deprecated: use double4_16a or double4_32a [-Wdeprecated-declarations]
+  276 |   cudaMemcpy((double4*)h_of1234, d_if1234, dbl4_size, cudaMemcpyDeviceToHost);
+      |                     ^
+/usr/local/cuda-13.2/targets/x86_64-linux/include/vector_types.h:564:104: note: declared here
+  564 | typedef __device_builtin__ struct double4 __VECTOR_TYPE_DEPRECATED__("use double4_16a or double4_32a") double4;
+      |                                                                                                        ^~~~~~~
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/fluidSim/baseline/kernels.cu:277:21: warning: ‘double4’ is deprecated: use double4_16a or double4_32a [-Wdeprecated-declarations]
+  277 |   cudaMemcpy((double4*)h_of5678, d_if5678, dbl4_size, cudaMemcpyDeviceToHost);
+      |                     ^
+/usr/local/cuda-13.2/targets/x86_64-linux/include/vector_types.h:564:104: note: declared here
+  564 | typedef __device_builtin__ struct double4 __VECTOR_TYPE_DEPRECATED__("use double4_16a or double4_32a") double4;
+      |                                                                                                        ^~~~~~~
+In file included from tmpxft_000bac6d_00000000-10_kernels.cudafe1.stub.c:1:
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/fluidSim/baseline/kernels.cu: At global scope:
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/fluidSim/baseline/kernels.cu:66:385: warning: ‘double4’ is deprecated: use double4_16a or double4_32a [-Wdeprecated-declarations]
+   66 | __global__ void lbm (
+      |                                                                                                                                                                                                                                                                                                                                                                                                 ^
+/usr/local/cuda-13.2/targets/x86_64-linux/include/vector_types.h:477:42: note: declared here
+  477 | __device_builtin__ __builtin_align__(16) double4
+      |                                          ^~~~~~~
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/fluidSim/baseline/kernels.cu:66:385: warning: ‘double4’ is deprecated: use double4_16a or double4_32a [-Wdeprecated-declarations]
+   66 | __global__ void lbm (
+      |                                                                                                                                                                                                                                                                                                                                                                                                 ^
+/usr/local/cuda-13.2/targets/x86_64-linux/include/vector_types.h:477:42: note: declared here
+  477 | __device_builtin__ __builtin_align__(16) double4
+      |                                          ^~~~~~~
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/fluidSim/baseline/kernels.cu:66:385: warning: ‘double4’ is deprecated: use double4_16a or double4_32a [-Wdeprecated-declarations]
+   66 | __global__ void lbm (
+      |                                                                                                                                                                                                                                                                                                                                                                                                 ^
+/usr/local/cuda-13.2/targets/x86_64-linux/include/vector_types.h:477:42: note: declared here
+  477 | __device_builtin__ __builtin_align__(16) double4
+      |                                          ^~~~~~~
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/fluidSim/baseline/kernels.cu:66:385: warning: ‘double4’ is deprecated: use double4_16a or double4_32a [-Wdeprecated-declarations]
+   66 | __global__ void lbm (
+      |                                                                                                                                                                                                                                                                                                                                                                                                 ^
+/usr/local/cuda-13.2/targets/x86_64-linux/include/vector_types.h:477:42: note: declared here
+  477 | __device_builtin__ __builtin_align__(16) double4
+      |                                          ^~~~~~~
+In file included from /tmp/tmpxft_000bac6d_00000000-10_kernels.cudafe1.stub.c:8:
+/tmp/tmpxft_000bac6d_00000000-10_kernels.cudafe1.stub.c: In function ‘void __nv_cudaEntityRegisterCallback(void**)’:
+/tmp/tmpxft_000bac6d_00000000-10_kernels.cudafe1.stub.c:1:453: warning: ‘double4’ is deprecated: use double4_16a or double4_32a [-Wdeprecated-declarations]
+    1 | #pragma GCC diagnostic push
+      |                                                                                                                                                                                                                                                                                                                                                                                                                                                                     ^
+/usr/local/cuda-13.2/targets/x86_64-linux/include/vector_types.h:477:42: note: declared here
+  477 | __device_builtin__ __builtin_align__(16) double4
+      |                                          ^~~~~~~
+/tmp/tmpxft_000bac6d_00000000-10_kernels.cudafe1.stub.c:1:453: warning: ‘double4’ is deprecated: use double4_16a or double4_32a [-Wdeprecated-declarations]
+    1 | #pragma GCC diagnostic push
+      |                                                                                                                                                                                                                                                                                                                                                                                                                                                                     ^
+/usr/local/cuda-13.2/targets/x86_64-linux/include/vector_types.h:477:42: note: declared here
+  477 | __device_builtin__ __builtin_align__(16) double4
+      |                                          ^~~~~~~
+/tmp/tmpxft_000bac6d_00000000-10_kernels.cudafe1.stub.c:1:453: warning: ‘double4’ is deprecated: use double4_16a or double4_32a [-Wdeprecated-declarations]
+    1 | #pragma GCC diagnostic push
+      |                                                                                                                                                                                                                                                                                                                                                                                                                                                                     ^
+/usr/local/cuda-13.2/targets/x86_64-linux/include/vector_types.h:477:42: note: declared here
+  477 | __device_builtin__ __builtin_align__(16) double4
+      |                                          ^~~~~~~
+/tmp/tmpxft_000bac6d_00000000-10_kernels.cudafe1.stub.c:1:453: warning: ‘double4’ is deprecated: use double4_16a or double4_32a [-Wdeprecated-declarations]
+    1 | #pragma GCC diagnostic push
+      |                                                                                                                                                                                                                                                                                                                                                                                                                                                                     ^
+/usr/local/cuda-13.2/targets/x86_64-linux/include/vector_types.h:477:42: note: declared here
+  477 | __device_builtin__ __builtin_align__(16) double4
+      |                                          ^~~~~~~
+
+COMPILE: SUCCESS

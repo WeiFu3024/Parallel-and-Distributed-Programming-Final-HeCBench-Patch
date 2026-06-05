@@ -1,88 +1,96 @@
 ============================================
   Hardware Specification Report
-  Generated: 2026-06-05T02:43:10+08:00
+  Generated: 2026-06-06T00:20:13+08:00
 ============================================
 
 ==================== GPU ====================
 
 [nvidia-smi overview]
-  GPU Name:              NVIDIA GeForce RTX 3050 Laptop GPU
-  Driver Version:        570.211.01
-  PCI Bus ID:            00000000:01:00.0
+  GPU Name:              NVIDIA GeForce RTX 3090
+  Driver Version:        595.71.05
+  PCI Bus ID:            00000000:18:00.0
   Compute Capability:    8.6
-  VRAM Total:            4096 MiB
-  VRAM Free:             3720 MiB
+  VRAM Total:            24576 MiB
+  VRAM Free:             24123 MiB
   Max SM Clock:          2100 MHz
-  Max Memory Clock:      6001 MHz
-  Power Limit:           [N/A] W
+  Max Memory Clock:      9751 MHz
+  Power Limit:           350.00 W
+  GPU Name:              NVIDIA GeForce RTX 3090
+  Driver Version:        595.71.05
+  PCI Bus ID:            00000000:51:00.0
+  Compute Capability:    8.6
+  VRAM Total:            24576 MiB
+  VRAM Free:             24123 MiB
+  Max SM Clock:          2100 MHz
+  Max Memory Clock:      9751 MHz
+  Power Limit:           350.00 W
+  GPU Name:              NVIDIA GeForce RTX 3090
+  Driver Version:        595.71.05
+  PCI Bus ID:            00000000:8A:00.0
+  Compute Capability:    8.6
+  VRAM Total:            24576 MiB
+  VRAM Free:             24123 MiB
+  Max SM Clock:          2100 MHz
+  Max Memory Clock:      9751 MHz
+  Power Limit:           350.00 W
+  GPU Name:              NVIDIA RTX A6000
+  Driver Version:        595.71.05
+  PCI Bus ID:            00000000:C3:00.0
+  Compute Capability:    8.6
+  VRAM Total:            49140 MiB
+  VRAM Free:             9961 MiB
+  Max SM Clock:          2100 MHz
+  Max Memory Clock:      8001 MHz
+  Power Limit:           300.00 W
 
 [CUDA Toolkit]
-  Cuda compilation tools, release 12.0, V12.0.140
+  Cuda compilation tools, release 13.2, V13.2.78
 
 [deviceQuery not found — compiling inline version]
-  Device 0: NVIDIA GeForce RTX 3050 Laptop GPU
-  Compute Capability:          8.6
-  SM Count:                    16
-  Max Threads per SM:          1536
-  Max Threads per Block:       1024
-  Warp Size:                   32
-  Global Memory:               3778 MiB
-  Shared Memory per Block:     49152 bytes
-  Shared Memory per SM:        102400 bytes
-  Registers per Block:         65536
-  Registers per SM:            65536
-  L2 Cache Size:               1572864 bytes (1.5 MiB)
-  Constant Memory:             65536 bytes
-  Memory Bus Width:            128 bits
-  Memory Clock Rate:           6001 MHz
-  Peak Memory Bandwidth:       192.0 GB/s
-  GPU Clock Rate:              1500 MHz
-  Concurrent Kernels:          Yes
-  Async Engines:               2
-  ECC Enabled:                 No
+  Failed to compile deviceQuery. Check CUDA installation.
 
 ==================== CPU ====================
 
 [CPU Model]
-  11th Gen Intel(R) Core(TM) i5-11300H @ 3.10GHz
+  Intel(R) Xeon(R) Silver 4310 CPU @ 2.10GHz
 
 [CPU Topology]
   Sockets:          1
-  Cores per Socket: 4
-  Logical CPUs:     8
+  Cores per Socket: 12
+  Logical CPUs:     24
   Threads per Core: 2
 
 [CPU Cache]
-  L1d cache:                               192 KiB (4 instances)
-  L1i cache:                               128 KiB (4 instances)
-  L2 cache:                                5 MiB (4 instances)
-  L3 cache:                                8 MiB (1 instance)
+  L1d cache:                               576 KiB (12 instances)
+  L1i cache:                               384 KiB (12 instances)
+  L2 cache:                                15 MiB (12 instances)
+  L3 cache:                                18 MiB (1 instance)
 
 ==================== Memory ====================
-  Total RAM:     15.3 GiB
-  Available RAM:  3.3 GiB
+  Total RAM:     188.1 GiB
+  Available RAM:  173.4 GiB
 
 [NUMA Topology]
   available: 1 nodes (0)
-  node 0 cpus: 0 1 2 3 4 5 6 7
-  node 0 size: 15682 MB
+  node 0 cpus: 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23
+  node 0 size: 192581 MB
 
 ==================== Toolchain ====================
 
 [Compilers]
   GCC:  gcc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0
   G++:  g++ (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0
-  NVCC: Cuda compilation tools, release 12.0, V12.0.140
+  NVCC: Cuda compilation tools, release 13.2, V13.2.78
 
 [OpenMP Support]
   OpenMP Version:      201511
-  Max Threads:         8
-  Num Procs:           8
-  Active Threads:      8
+  Max Threads:         24
+  Num Procs:           24
+  Active Threads:      24
 
 ==================== OS ====================
-  OS:     Ubuntu 24.04.2 LTS
-  Kernel: 6.17.0-14-generic
+  OS:     Ubuntu 24.04.4 LTS
+  Kernel: 6.8.0-111-generic
   Arch:   x86_64
 
 ============================================

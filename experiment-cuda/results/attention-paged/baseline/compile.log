@@ -1,0 +1,6 @@
+=== compile.sh | attention-paged/baseline ===
+=== arch: sm_86 | 2026-06-06T01:09:19+08:00 ===
+=== nvcc: release 13.2 ===
+
+
+COMPILE: SUCCESS
