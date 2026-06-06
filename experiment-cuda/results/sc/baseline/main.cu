@@ -8,7 +8,7 @@
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
- * with the Software without restriction, including without limitation the 
+ * with the Software without restriction, including without limitation the
  * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
  * sell copies of the Software, and to permit persons to whom the Software is
  * furnished to do so, subject to the following conditions:
@@ -18,14 +18,14 @@
  *      > Redistributions in binary form must reproduce the above copyright
  *        notice, this list of conditions and the following disclaimers in the
  *        documentation and/or other materials provided with the distribution.
- *      > Neither the names of IMPACT Research Group, University of Cordoba, 
- *        University of Illinois nor the names of its contributors may be used 
- *        to endorse or promote products derived from this Software without 
+ *      > Neither the names of IMPACT Research Group, University of Cordoba,
+ *        University of Illinois nor the names of its contributors may be used
+ *        to endorse or promote products derived from this Software without
  *        specific prior written permission.
  *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE 
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
  * CONTRIBUTORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
  * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS WITH
@@ -33,19 +33,309 @@
  *
  */
 
+// System includes (deduplicated)
 #include <string.h>
 #include <unistd.h>
 #include <thread>
 #include <assert.h>
 #include <chrono>
+#include <atomic>
+#include <math.h>
+#include <vector>
+#include <algorithm>
+#include <iostream>
 #include <cuda.h>
 
-#include "kernel.h"
+// Local dep includes (kept as separate dep files).
+// Include support/partitioner.h WITHOUT _GPU_COMPILER_ so that the full
+// Partitioner struct (with thread_id, n_threads) and the CPU partitioner
+// functions are available throughout the entire translation unit.
 #include "support/setup.h"
 #include "support/common.h"
 #include "support/verify.h"
+#include "support/partitioner.h"
 
-// Params ---------------------------------------------------------------------
+// ---- device_sc.cu body (inlined) ----
+// Define the GPU-side partitioner iterators here, since they were skipped
+// when partitioner.h was included without _GPU_COMPILER_.
+// These mirror the #ifdef _GPU_COMPILER_ sections of partitioner.h exactly.
+
+__device__ inline int gpu_first(Partitioner *p) {
+#ifdef DYNAMIC_PARTITION
+    if(p->strategy == DYNAMIC_PARTITIONING) {
+        if(threadIdx.y == 0 && threadIdx.x == 0) {
+            p->tmp[0] = atomicAdd_system(p->worklist, 1);
+        }
+        __syncthreads();
+        p->current = p->tmp[0];
+    } else
+#endif
+    {
+        p->current = p->cut + blockIdx.x;
+    }
+    return p->current;
+}
+
+__device__ inline bool gpu_more(const Partitioner *p) {
+    return (p->current < p->n_tasks);
+}
+
+__device__ inline int gpu_next(Partitioner *p) {
+#ifdef DYNAMIC_PARTITION
+    if(p->strategy == DYNAMIC_PARTITIONING) {
+        if(threadIdx.y == 0 && threadIdx.x == 0) {
+            p->tmp[0] = atomicAdd_system(p->worklist, 1);
+        }
+        __syncthreads();
+        p->current = p->tmp[0];
+    } else
+#endif
+    {
+        p->current = p->current + gridDim.x;
+    }
+    return p->current;
+}
+
+// Define the GPU version of partitioner_create (2-arg, __device__ overload)
+__device__ inline Partitioner partitioner_create_gpu(int n_tasks, float alpha
+#ifdef DYNAMIC_PARTITION
+    , int *worklist
+    , int *tmp
+#endif
+    ) {
+    Partitioner p;
+    p.n_tasks = n_tasks;
+    if(alpha >= 0.0 && alpha <= 1.0) {
+        p.cut = p.n_tasks * alpha;
+#ifdef DYNAMIC_PARTITION
+        p.strategy = STATIC_PARTITIONING;
+#endif
+    } else {
+#ifdef DYNAMIC_PARTITION
+        p.strategy = DYNAMIC_PARTITIONING;
+        p.worklist = worklist;
+        p.tmp = tmp;
+#endif
+    }
+    return p;
+}
+
+// Device auxiliary functions
+__attribute__((weak)) __device__ void reduce(int *l_count, int local_cnt, int *l_data) {
+  const int tid       = threadIdx.x;
+  const int localSize = blockDim.x;
+  // load shared mem
+  l_data[tid] = local_cnt;
+  __syncthreads();
+  // do reduction in shared mem
+  for(int s = localSize >> 1; s > 0; s >>= 1) {
+    if(tid < s) {
+      l_data[tid] += l_data[tid + s];
+    }
+    __syncthreads();
+  }
+  // write result for this block to global mem
+  if(tid == 0)
+    *l_count = l_data[0];
+}
+
+__attribute__((weak)) __device__ int block_binary_prefix_sums(int *l_count, int x, int *l_data) {
+  l_data[threadIdx.x] = x;
+  const int length     = blockDim.x;
+  // Build up tree
+  int offset = 1;
+  for(int l = length >> 1; l > 0; l >>= 1) {
+    __syncthreads();
+    if(threadIdx.x < l) {
+      int ai = offset * (2 * threadIdx.x + 1) - 1;
+      int bi = offset * (2 * threadIdx.x + 2) - 1;
+      l_data[bi] += l_data[ai];
+    }
+    offset <<= 1;
+  }
+  if(offset < length) {
+    offset <<= 1;
+  }
+  // Build down tree
+  int maxThread = offset >> 1;
+  for(int d = 0; d < maxThread; d <<= 1) {
+    d += 1;
+    offset >>= 1;
+    __syncthreads();
+    if(threadIdx.x < d) {
+      int ai = offset * (threadIdx.x + 1) - 1;
+      int bi = ai + (offset >> 1);
+      l_data[bi] += l_data[ai];
+    }
+  }
+  __syncthreads();
+  int output = l_data[threadIdx.x] + *l_count - x;
+  __syncthreads();
+  if(threadIdx.x == blockDim.x - 1)
+    *l_count += l_data[threadIdx.x];
+
+  return output;
+}
+
+__attribute__((weak)) __global__
+void StreamCompaction (int size, T value, int n_tasks, float alpha,
+                       T *__restrict__ output,
+                       const T *__restrict__ input,
+                       int *__restrict__ flags
+#ifdef DYNAMIC_PARTITION
+                       , int *__restrict__ worklist
+#endif
+    ) {
+
+  extern __shared__ int l_mem[];
+  int* l_data = l_mem;
+  int* l_count = &l_data[blockDim.x];
+#ifdef DYNAMIC_PARTITION
+  int* l_tmp = &l_count[1];
+#endif
+
+#ifdef DYNAMIC_PARTITION
+  Partitioner p = partitioner_create_gpu(n_tasks, alpha, worklist, l_tmp);
+#else
+  Partitioner p = partitioner_create_gpu(n_tasks, alpha);
+#endif
+
+  for(int my_s = gpu_first(&p); gpu_more(&p); my_s = gpu_next(&p)) {
+
+    if(threadIdx.x == 0) {
+      l_count[0] = 0;
+    }
+    __syncthreads();
+
+    int local_cnt = 0;
+    // Declare on-chip memory
+    T reg[REGS];
+#ifdef DYNAMIC_PARTITION
+    int pos = my_s * REGS * blockDim.x + threadIdx.x;
+#else
+    int pos = (my_s - p.cut) * REGS * blockDim.x + threadIdx.x;
+#endif
+    // Load in on-chip memory
+#pragma unroll
+    for(int j = 0; j < REGS; j++) {
+      if(pos < size) {
+        reg[j] = input[pos];
+        if(reg[j] != value)
+          local_cnt++;
+      } else
+        reg[j] = value;
+      pos += blockDim.x;
+    }
+    reduce(&l_count[0], local_cnt, &l_data[0]);
+
+    // Set global synch
+    if(threadIdx.x == 0) {
+      int p_count;
+#ifdef DYNAMIC_PARTITION
+      while((p_count = atomicAdd_system(&flags[my_s], 0)) == 0) {
+      }
+      atomicAdd_system(&flags[my_s + 1], p_count + l_count[0]);
+#else
+      while((p_count = atomicAdd(&flags[my_s], 0)) == 0) {
+      }
+      atomicAdd(&flags[my_s + 1], p_count + l_count[0]);
+#endif
+      l_count[0] = p_count - 1;
+    }
+    __syncthreads();
+
+    // Store to global memory
+#pragma unroll
+    for(int j = 0; j < REGS; j++) {
+      pos = block_binary_prefix_sums(&l_count[0], (int)((reg[j] != value) ? 1 : 0), &l_data[0]);
+      if(reg[j] != value) {
+        output[pos] = reg[j];
+      }
+    }
+  }
+}
+
+__attribute__((weak))
+void call_StreamCompaction_kernel(int blocks, int threads, int size, T value, int n_tasks, float alpha,
+    T *output, T *input, int *flags, int l_mem_size
+#ifdef DYNAMIC_PARTITION
+    , int *worklist
+#endif
+    ){
+  dim3 dimGrid(blocks);
+  dim3 dimBlock(threads);
+  StreamCompaction <<<dimGrid, dimBlock, l_mem_size>>>(size, value, n_tasks, alpha, output, input, flags
+#ifdef DYNAMIC_PARTITION
+      , worklist
+#endif
+      );
+}
+
+// ---- host_sc.cpp body (inlined) ----
+
+// CPU threads
+__attribute__((weak))
+void run_cpu_threads(T *output, T *input, std::atomic_int *flags, int size, int value, int n_threads, int ldim,
+    int n_tasks, float alpha
+#ifdef DYNAMIC_PARTITION
+    , std::atomic_int *worklist
+#endif
+    ) {
+
+    const int REGS_CPU = REGS * ldim;
+    std::vector<std::thread> cpu_threads;
+    for(int i = 0; i < n_threads; i++) {
+        cpu_threads.push_back(std::thread([=]() {
+
+#ifdef DYNAMIC_PARTITION
+            Partitioner p = partitioner_create(n_tasks, alpha, i, n_threads, worklist);
+#else
+            Partitioner p = partitioner_create(n_tasks, alpha, i, n_threads);
+#endif
+
+            for(int my_s = cpu_first(&p); cpu_more(&p); my_s = cpu_next(&p)) {
+
+                int l_count = 0;
+                // Declare on-chip memory
+                T   reg[REGS_CPU];
+                int pos = my_s * REGS_CPU;
+// Load in on-chip memory
+#pragma unroll
+                for(int j = 0; j < REGS_CPU; j++) {
+                    if(pos < size) {
+                        reg[j] = input[pos];
+                        if(reg[j] != value)
+                            l_count++;
+                    } else
+                        reg[j] = value;
+                    pos++;
+                }
+
+                // Set global synch
+                int p_count;
+                while((p_count = (&flags[my_s])->load()) == 0) {
+                }
+                (&flags[my_s + 1])->fetch_add(p_count + l_count);
+                l_count = p_count - 1;
+
+                // Store to global memory
+                pos = l_count;
+#pragma unroll
+                for(int j = 0; j < REGS_CPU; j++) {
+                    if(reg[j] != value) {
+                        output[pos] = reg[j];
+                        pos++;
+                    }
+                }
+            }
+        }));
+    }
+    std::for_each(cpu_threads.begin(), cpu_threads.end(), [](std::thread &t) { t.join(); });
+}
+
+// ---- main.cu body ----
+
+// Params
 struct Params {
 
     int   device;
@@ -135,7 +425,7 @@ struct Params {
     }
 };
 
-// Input Data -----------------------------------------------------------------
+// Input Data
 void read_input(T *input, const Params &p) {
 
     // Initialize the host input vectors
@@ -225,7 +515,7 @@ int main(int argc, char **argv) {
 
         // Kernel launch
         if(p.n_gpu_blocks > 0) {
-            assert(p.n_gpu_threads <= max_gpu_threads && 
+            assert(p.n_gpu_threads <= max_gpu_threads &&
                 "The thread block size is greater than the maximum thread block size that can be used on this device");
             call_StreamCompaction_kernel(p.n_gpu_blocks, p.n_gpu_threads, p.in_size, p.remove_value, n_tasks, p.alpha,
                 d_in_out, d_in_out, (int*)d_flags,

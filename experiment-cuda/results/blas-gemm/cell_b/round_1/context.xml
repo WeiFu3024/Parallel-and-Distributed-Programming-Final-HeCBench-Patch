@@ -1,0 +1,96 @@
+<Context_Normalization>
+  <Problem_Classification>
+    <Domain>Dense Linear Algebra (BLAS Level-3)</Domain>
+    <Algorithm>GEMM (General Matrix-Matrix Multiplication)</Algorithm>
+    <Algorithm_Purpose>Computes C = alpha * op(A) * op(B) + beta * C where A is M×K, B is K×N, C is M×N. The example runs a naive custom CUDA kernel (matrix_mul) and validates / benchmarks it against the corresponding cuBLAS routine (cublasHgemm / cublasSgemm / cublasDgemm) for half, float, and double precisions.</Algorithm_Purpose>
+    <Algorithm_Steps>
+      1. Allocate host buffers a (M*K), b (K*N), c (M*N), r (M*N) and fill with random values via rand_matrix.
+      2. Allocate four device buffers (da, db, dc, dr) and H2D-copy a→da, b→db, c→dc, c→dr.
+      3. Create a cuBLAS handle.
+      4. Launch the naive matrix_mul kernel on (da, db, dr) using a 2-D grid of TILE_X×TILE_Y (16×16) blocks; each thread:
+         - Computes (row, col) from blockIdx/threadIdx.
+         - Bounds-checks (row < M && col < N).
+         - Performs a serial K-length dot product: s += a[row*K+k] * b[k*N+col].
+         - Writes c[row*N+col] = alpha*s + beta*c[row*N+col].
+      5. Launch a single cublas?gemm on (db, da, dc) (note swapped operands + transpose-free interface to emulate row-major C) for correctness comparison.
+      6. memcmp dr vs dc to PASS/FAIL.
+      7. Benchmarking loop: repeat cublas?gemm `repeat` times bracketed by cudaDeviceSynchronize() and a steady_clock timer; report performance.
+      8. Optional DEBUG print of 2×2 corners.
+      9. Destroy cuBLAS handle, free device + host buffers.
+    </Algorithm_Steps>
+    <Reference_Complexity>
+      Time: O(M·N·K) arithmetic operations (≈2·M·N·K FLOPs per GEMM).
+      Space: O(M·K + K·N + M·N) for each of A, B, C; the host additionally keeps a reference copy r (extra M·N).
+    </Reference_Complexity>
+  </Problem_Classification>
+
+  <Bottleneck_Analysis>
+    <Classification>Memory-bound (for the naive matrix_mul kernel as written; the cuBLAS path is compute-bound).</Classification>
+    <Arithmetic_Intensity>
+      Naive kernel per output element: 2·K FLOPs vs. 2·K loads from global memory (K elements of A row + K elements of B column) + 1 load + 1 store of C ≈ (2K+2)·sizeof(T) bytes.
+      • FP32 (4 B): AI ≈ 2K / (8K+8) ≈ 0.25 FLOP/byte (≈ 1 FLOP per 4 bytes).
+      • FP16 (2 B): AI ≈ 2K / (4K+4) ≈ 0.50 FLOP/byte.
+      • FP64 (8 B): AI ≈ 2K / (16K+16) ≈ 0.125 FLOP/byte.
+      With L1/L2 cache reuse from neighboring threads in the same block, effective AI improves moderately (each A row is reused by TILE_X threads, each B col by TILE_Y threads → up to ~16× boost), but no explicit shared-memory tiling is used.
+    </Arithmetic_Intensity>
+    <Ridge_Point_Comparison>
+      RTX A6000 peak FP32 ≈ 38.7 TFLOPs, peak HBM/GDDR6 bandwidth ≈ 768 GB/s ⇒ FP32 ridge point ≈ 38.7e12 / 768e9 ≈ 50 FLOP/byte.
+      FP16 (Tensor Core) ridge point is far higher (~300 FLOP/byte); FP64 ridge point ≈ 1.6 FLOP/byte.
+      The naive kernel’s ~0.25 FLOP/byte (FP32) is roughly 200× below the ridge point ⇒ deeply on the bandwidth-limited side of the roofline. Even cache-amplified AI (~4 FLOP/byte) stays well below the ridge for FP16/FP32 and only approaches the FP64 ridge.
+    </Ridge_Point_Comparison>
+    <Dominant_Limiter>Global-memory bandwidth and uncoalesced/redundant traffic on A (broadcast pattern repeated K times per row, with no shared-memory staging). For the cuBLAS path the limiter is expected to flip to Tensor-Core / FMA throughput on FP16 and FP32 cores on FP32/FP64.</Dominant_Limiter>
+  </Bottleneck_Analysis>
+
+  <Memory_Access_Profile>
+    <Pattern>Strided / repeated streaming. Within a warp (32 consecutive threadIdx.x along the col direction): b[k*N + col] is a unit-stride coalesced load; a[row*K + k] is a broadcast (all 32 lanes share the same address); c[row*N + col] is a coalesced read-modify-write. Across the K loop, both A and B are walked linearly.</Pattern>
+    <Read_Write_Ratio>Per output element: (K from A) + (K from B) + (1 from C) reads vs. 1 write to C ⇒ ≈ (2K+1):1, i.e. read-dominated.</Read_Write_Ratio>
+    <Reuse_Factor>
+      Theoretical: each A element is reused N times (once per output column), each B element M times (once per output row), each C element 1 time.
+      In this naive kernel only block-level cache reuse is exploited: an A row is implicitly reused by TILE_X=16 threads in the same warp/row, and a B column by TILE_Y=16 threads; no explicit shared-memory or register tiling, so K-loop loads go to L1/L2 rather than shared memory.
+    </Reuse_Factor>
+    <Coalescing_Feasibility>Natural for B and C (col-major within a warp gives 128-byte aligned loads for FP32). A loads are broadcast within a warp (single 4 B fetch served to 32 lanes — efficient). Overall coalescing is already good; the inefficiency is redundancy, not misalignment.</Coalescing_Feasibility>
+    <Optimal_Tiling_Hint>
+      Classic shared-memory tile: BM×BK and BK×BN tiles (e.g., BM=BN=128, BK=16) with register-blocking 8×8 per thread. A minimal first step: 16×16 (or 32×32) shared-memory tile of A and B.
+      Per-block shared memory for FP32 (BM=BN=32, BK=32): 2 · 32·32 · 4 B = 8 KB; for BM=BN=128, BK=16: 2 · 128·16 · 4 B = 16 KB — both well within A6000’s 100 KB/SM.
+      Additional wins: vectorized float4/half2 loads, double-buffering across K-tiles, and for FP16 use of WMMA / Tensor Cores.
+    </Optimal_Tiling_Hint>
+  </Memory_Access_Profile>
+
+  <Parallelism_Structure>
+    <Granularity>One thread computes exactly one C[row, col] element via a full K-length serial dot product (no work per thread on multiple outputs and no K-dimension splitting).</Granularity>
+    <Independence>Fully independent across (row, col); each thread writes a distinct C element with no inter-thread reductions or shared state. No RAW/WAW hazards.</Independence>
+    <Synchronization>None inside the kernel — no __syncthreads(), no atomics, no warp shuffles. The only synchronization is host-side cudaDeviceSynchronize() around the cuBLAS timing region.</Synchronization>
+    <Recommended_Block_Size>
+      Current 16×16 = 256 threads/block is reasonable for occupancy on CC 8.6 (1536 threads/SM ⇒ up to 6 resident blocks/SM, 48 warps/SM = full occupancy if registers permit). For a tiled rewrite, 16×16 or 32×8 = 256 threads with 8×8 register-blocking per thread (effective tile 128×64) is a strong sweet spot on A6000. 32×32 = 1024 threads/block fits the hardware limit but lowers achievable occupancy to 1 block/SM.
+    </Recommended_Block_Size>
+  </Parallelism_Structure>
+
+  <Hardware_Constraints>
+    <Architecture>NVIDIA Ampere (GA102)</Architecture>
+    <Compute_Capability>8.6</Compute_Capability>
+    <SM_Count>84</SM_Count>
+    <Max_Threads_Per_SM>1536</Max_Threads_Per_SM>
+    <Max_Threads_Per_Block>1024</Max_Threads_Per_Block>
+    <Warp_Size>32</Warp_Size>
+    <Shared_Memory_Per_Block>49152 B default; up to 100 KB (102400 B) opt-in via cudaFuncSetAttribute on CC 8.6</Shared_Memory_Per_Block>
+    <Shared_Memory_Per_SM>102400 B (100 KB) of unified L1/shared, of which up to 100 KB can be configured as shared</Shared_Memory_Per_SM>
+    <Registers_Per_Block>65536 (32-bit registers)</Registers_Per_Block>
+    <Registers_Per_SM>65536 (32-bit registers)</Registers_Per_SM>
+    <L2_Cache_Size>6291456 B (6 MB)</L2_Cache_Size>
+    <Constant_Memory>65536 B (64 KB)</Constant_Memory>
+    <Memory_Bus_Width>384-bit (GDDR6, ECC-capable; this card reports 48 GB ⇒ ECC ON variant)</Memory_Bus_Width>
+    <Peak_Memory_Bandwidth>~768 GB/s (8001 MHz mem clock × 2 (DDR) × 384 b / 8 ≈ 768 GB/s; ECC enabled trims effective BW by ~6–12%)</Peak_Memory_Bandwidth>
+    <GPU_Clock_Rate>Max boost 2100 MHz (typical sustained ~1800 MHz)</GPU_Clock_Rate>
+  </Hardware_Constraints>
+
+  <Data_Shape>
+    <Input_Dimensions>A: M×K, B: K×N, C: M×N (all row-major, contiguous). M, K, N are user-supplied positive integers (argv[1..3]); the kernel grid is ((N+15)/16, (M+15)/16) blocks of 16×16 threads.</Input_Dimensions>
+    <Data_Type>Run three times by template: __half (FP16, 2 B), float (FP32, 4 B), double (FP64, 8 B). Note: the naive matrix_mul kernel uses T s = 0 — for __half this requires implicit conversion and the accumulator is fp16, which is numerically risky for large K (cuBLAS Hgemm path is the gold reference here).</Data_Type>
+    <Total_Memory_Footprint>
+      Per precision run: host = sizeof(T)·(M·K + K·N + 2·M·N); device = sizeof(T)·(M·K + K·N + 2·M·N) (da, db, dc, dr).
+      Example (FP32, M=K=N=4096): each matrix = 64 MiB ⇒ host ≈ 256 MiB, device ≈ 256 MiB.
+      Example (FP64, same shape): host ≈ 512 MiB, device ≈ 512 MiB.
+      All three precision invocations are sequential (buffers are freed between them), so peak resident GPU memory ≈ sizeof(largest T)·(M·K + K·N + 2·M·N) plus cuBLAS workspace.
+    </Total_Memory_Footprint>
+  </Data_Shape>
+</Context_Normalization>

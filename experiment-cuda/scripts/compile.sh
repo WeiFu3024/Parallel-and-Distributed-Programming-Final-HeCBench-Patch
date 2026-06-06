@@ -131,10 +131,10 @@ case "${BENCHMARK}" in
     EXTRA_NVCC_FLAGS=("-Xcompiler" "-fopenmp")
     ;;
   binomial)
-    # kernel.cu / reference.cu are separate translation units
-    EXTRA_DEPS=("kernel.cu" "reference.cu" "binomialOptions.h" "realtype.h")
+    # Merged: kernel.cu + reference.cu inlined into main.cu (single-file baseline)
+    EXTRA_DEPS=("binomialOptions.h" "realtype.h")
     EXTRA_DIRS=()
-    EXTRA_SRCS=("kernel.cu" "reference.cu")
+    EXTRA_SRCS=()
     EXTRA_NVCC_FLAGS=()
     ;;
   black-scholes)
@@ -180,19 +180,19 @@ case "${BENCHMARK}" in
     EXTRA_NVCC_FLAGS=()
     ;;
   fluidSim)
-    # kernels.cu is a separate translation unit
-    EXTRA_DEPS=("kernels.cu" "reference.h" "utils.h")
+    # Merged: kernels.cu inlined into main.cu (single-file baseline)
+    EXTRA_DEPS=("utils.h" "reference.h")
     EXTRA_DIRS=()
-    EXTRA_SRCS=("kernels.cu")
+    EXTRA_SRCS=()
     EXTRA_NVCC_FLAGS=()
     ;;
   heartwall)
     # kernel/ and util/ are subdirectories with .c/.cu sources
     # main.cu uses -I./util/timer and -I./util/file (as in the original Makefile)
+    # kernel/kernel.cu is inlined into main.cu (single-file baseline), so not in EXTRA_SRCS
     EXTRA_DEPS=("main.h")
     EXTRA_DIRS=("kernel" "util")
-    EXTRA_SRCS=("kernel/kernel.cu"
-                "util/avi/avilib.c"
+    EXTRA_SRCS=("util/avi/avilib.c"
                 "util/avi/avimod.c"
                 "util/file/file.c"
                 "util/timer/timer.c")
@@ -241,7 +241,8 @@ case "${BENCHMARK}" in
     EXTRA_NVCC_FLAGS=()
     ;;
   mcpr)
-    EXTRA_DEPS=("kernels.h" "reference.h")
+    # Merged: kernels.h + reference.h inlined into main.cu (single-file baseline)
+    EXTRA_DEPS=()
     EXTRA_DIRS=()
     EXTRA_SRCS=()
     EXTRA_NVCC_FLAGS=()
@@ -265,10 +266,10 @@ case "${BENCHMARK}" in
     EXTRA_NVCC_FLAGS=("-Xcompiler" "-fopenmp")
     ;;
   sc)
-    # device_sc.cu / host_sc.cpp are separate TUs; support/ contains headers
-    EXTRA_DEPS=("device_sc.cu" "host_sc.cpp" "kernel.h")
+    # Merged: device_sc.cu + kernel.h + host_sc.cpp inlined into main.cu (single-file baseline)
+    EXTRA_DEPS=()
     EXTRA_DIRS=("support")
-    EXTRA_SRCS=("device_sc.cu" "host_sc.cpp")
+    EXTRA_SRCS=()
     EXTRA_NVCC_FLAGS=("-lpthread")
     ;;
   scan)
@@ -290,10 +291,10 @@ case "${BENCHMARK}" in
     EXTRA_NVCC_FLAGS=()
     ;;
   sssp)
-    # kernel.cu is a separate translation unit; support/ contains headers
-    EXTRA_DEPS=("kernel.cu" "kernel.h")
+    # Merged: kernel.cu inlined into main.cu (single-file baseline); kernel.h kept as dep
+    EXTRA_DEPS=("kernel.h")
     EXTRA_DIRS=("support")
-    EXTRA_SRCS=("kernel.cu")
+    EXTRA_SRCS=()
     EXTRA_NVCC_FLAGS=("-lpthread")
     ;;
   transpose)

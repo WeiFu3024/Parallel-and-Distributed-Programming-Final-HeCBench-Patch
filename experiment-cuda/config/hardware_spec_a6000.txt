@@ -1,0 +1,71 @@
+============================================
+  Hardware Specification Report
+  Generated: 2026-06-06T00:20:13+08:00
+============================================
+
+==================== GPU ====================
+
+[nvidia-smi overview]
+  GPU Name:              NVIDIA RTX A6000
+  Driver Version:        595.71.05
+  PCI Bus ID:            00000000:C3:00.0
+  Compute Capability:    8.6
+  VRAM Total:            49140 MiB
+  VRAM Free:             9961 MiB
+  Max SM Clock:          2100 MHz
+  Max Memory Clock:      8001 MHz
+  Power Limit:           300.00 W
+
+[CUDA Toolkit]
+  Cuda compilation tools, release 13.2, V13.2.78
+
+[deviceQuery not found — compiling inline version]
+  Failed to compile deviceQuery. Check CUDA installation.
+
+==================== CPU ====================
+
+[CPU Model]
+  Intel(R) Xeon(R) Silver 4310 CPU @ 2.10GHz
+
+[CPU Topology]
+  Sockets:          1
+  Cores per Socket: 12
+  Logical CPUs:     24
+  Threads per Core: 2
+
+[CPU Cache]
+  L1d cache:                               576 KiB (12 instances)
+  L1i cache:                               384 KiB (12 instances)
+  L2 cache:                                15 MiB (12 instances)
+  L3 cache:                                18 MiB (1 instance)
+
+==================== Memory ====================
+  Total RAM:     188.1 GiB
+  Available RAM:  173.4 GiB
+
+[NUMA Topology]
+  available: 1 nodes (0)
+  node 0 cpus: 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23
+  node 0 size: 192581 MB
+
+==================== Toolchain ====================
+
+[Compilers]
+  GCC:  gcc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0
+  G++:  g++ (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0
+  NVCC: Cuda compilation tools, release 13.2, V13.2.78
+
+[OpenMP Support]
+  OpenMP Version:      201511
+  Max Threads:         24
+  Num Procs:           24
+  Active Threads:      24
+
+==================== OS ====================
+  OS:     Ubuntu 24.04.4 LTS
+  Kernel: 6.8.0-111-generic
+  Arch:   x86_64
+
+============================================
+  Report complete
+============================================

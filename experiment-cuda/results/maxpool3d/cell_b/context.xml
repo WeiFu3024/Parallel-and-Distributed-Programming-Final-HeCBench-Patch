@@ -1,0 +1,89 @@
+<Context_Normalization>
+  <Problem_Classification>
+    <Domain>Deep Learning / Computer Vision — CNN inference primitive</Domain>
+    <Algorithm>2D Max Pooling applied over a batch of feature maps (kernel name is "maxpool3d" but the third dimension is batch/channel, not a true spatial Z; window is purely 2D)</Algorithm>
+    <Algorithm_Purpose>Down-samples each 2D image/feature-map by taking the maximum value within each non-overlapping pool_width × pool_height window (2×2 here, since pool size == stride). Output spatial dims = input/2 in both axes; batch dim preserved.</Algorithm_Purpose>
+    <Algorithm_Steps>
+      1. Host: allocate H×W×N float buffer, fill with rand()%256/255.
+      2. cudaMalloc d_image and d_result; H2D copy of input.
+      3. Launch maxpool3d with grid = (ceil(Wo/8), ceil(Ho/8), ceil(N/4)) and block = (8,8,4) = 256 threads.
+      4. Each thread maps to one (x,y,z) output element. It computes input base index (xidx=2x, yidx=2y) and loops r∈[0,2), c∈[0,2): reads 4 input elements with fmaxf, init max=0.
+      5. Writes single max to o_img[((z*Ho)+y)*Wo + x].
+      6. Repeat 'repeat' times; D2H copy; CPU re-computes ground truth and memcmp-verifies.
+    </Algorithm_Steps>
+    <Reference_Complexity>
+      Time: O(N · Wo · Ho · pool_w · pool_h) = O(N·W·H) since pool=stride=2 ⇒ each input element visited exactly once.
+      Space: O(N·W·H) input + O(N·W·H/4) output ≈ 1.25·N·W·H·sizeof(float).
+    </Reference_Complexity>
+  </Problem_Classification>
+
+  <Bottleneck_Analysis>
+    <Classification>Memory-bound (bandwidth-limited streaming kernel)</Classification>
+    <Arithmetic_Intensity>
+      Per output element: 4 input loads + 1 output store = 5 × 4 B = 20 B traffic (assuming no L1/L2 reuse beyond what hardware coalesces; with perfect coalescing the input bytes are still 16 B and output 4 B = 20 B).
+      Useful work per output: 3 fmaxf ops (≈3 "FLOPs"), plus ~4 integer index ops which aren't FLOPs.
+      AI ≈ 3 FLOP / 20 B = 0.15 FLOP/B.
+      Even counting the init compare with 0, AI ≤ 0.20 FLOP/B.
+    </Arithmetic_Intensity>
+    <Ridge_Point_Comparison>
+      RTX A6000 peak FP32 ≈ 38.7 TFLOPS, peak BW ≈ 768 GB/s ⇒ ridge ≈ 38700/768 ≈ 50 FLOP/B.
+      Kernel AI (0.15) is ~330× below the ridge ⇒ deeply in the memory-bound regime.
+    </Ridge_Point_Comparison>
+    <Dominant_Limiter>Global memory bandwidth (DRAM throughput). Secondary limiter: uncoalesced / strided load pattern that wastes effective bandwidth and possibly L1 sector efficiency. Compute units are largely idle.</Dominant_Limiter>
+  </Bottleneck_Analysis>
+
+  <Memory_Access_Profile>
+    <Pattern>Sliding-window with stride == window (i.e. non-overlapping tiles). Globally a streaming read of the full input with strided gather per warp due to the (x,y) row interleave.</Pattern>
+    <Read_Write_Ratio>4:1 (4 input loads per 1 store per output)</Read_Write_Ratio>
+    <Reuse_Factor>1.0 — because pool_w == Hstride and pool_h == Vstride, every input element is read exactly once across the whole kernel. No algorithmic reuse; shared memory would only help by improving coalescing, not by reducing traffic.</Reuse_Factor>
+    <Coalescing_Feasibility>
+      Requires transformation. With blockDim=(8,8,4), a warp of 32 threads contains threadIdx.x∈[0,7] × threadIdx.y∈[0,3] (z fixed). Within a warp, threads with the same y but different x access input addresses (z·H+2y+r)·W + 2x for c=0 — i.e., stride-2 along the row. For each r,c iteration the warp issues stride-2 accesses spanning 8 consecutive (x*2) positions plus 4 rows ⇒ multiple 32-byte sectors per memory transaction, effective bandwidth utilization ≈ 50%. A 1D layout (e.g. blockDim.x = 32 or 64, contiguous along output-x) plus an outer loop over r would coalesce perfectly.
+    </Coalescing_Feasibility>
+    <Optimal_Tiling_Hint>
+      Two viable strategies:
+      (a) Coalesce-only fix: blockDim = (32, 4, 1) or (64, 2, 1), one thread per output pixel; rely on L1/L2 for the second row. No shared memory needed (≈0 B/block).
+      (b) Shared-memory tile: load a (2·BX) × (2·BY) input tile per block into SMEM, then 2×2 reduce. For BX=BY=16 → 32×32 input tile = 4096 B per block (well within 100 KB SM budget), enabling fully coalesced 128-byte loads and trivial intra-warp reduction. Either choice should approach DRAM peak; strategy (a) is simpler and likely sufficient since reuse factor is 1.
+    </Optimal_Tiling_Hint>
+  </Memory_Access_Profile>
+
+  <Parallelism_Structure>
+    <Granularity>One thread per output element (x,y,z). Each thread does 4 loads + 3 max + 1 store.</Granularity>
+    <Independence>Fully independent — no cross-thread data dependency, no reduction across blocks.</Independence>
+    <Synchronization>None in the current kernel. Would need __syncthreads() only if a shared-memory tiling variant is introduced.</Synchronization>
+    <Recommended_Block_Size>
+      Current (8,8,4)=256 threads is acceptable but x-dimension is too narrow for coalescing.
+      Theoretical recommendation for CC 8.6 (1536 threads/SM, 16 blocks/SM max):
+        • 256 threads/block as (32,8,1) — 6 blocks/SM, 100% occupancy ceiling on threads, 1 warp per row → perfect coalescing.
+        • Or 128 threads (32,4,1) — 12 blocks/SM, also full thread occupancy and lower per-block resource pressure.
+      Register usage of this kernel is small (~16–20 regs), so occupancy will not be register-limited.
+    </Recommended_Block_Size>
+  </Parallelism_Structure>
+
+  <Hardware_Constraints>
+    <Architecture>NVIDIA Ampere (GA102)</Architecture>
+    <Compute_Capability>8.6</Compute_Capability>
+    <SM_Count>84</SM_Count>
+    <Max_Threads_Per_SM>1536</Max_Threads_Per_SM>
+    <Max_Threads_Per_Block>1024</Max_Threads_Per_Block>
+    <Warp_Size>32</Warp_Size>
+    <Shared_Memory_Per_Block>99 KB (101376 B) opt-in maximum; 48 KB default static limit</Shared_Memory_Per_Block>
+    <Shared_Memory_Per_SM>100 KB (102400 B) unified L1/SMEM partition; up to 100 KB usable as SMEM</Shared_Memory_Per_SM>
+    <Registers_Per_Block>65536</Registers_Per_Block>
+    <Registers_Per_SM>65536</Registers_Per_SM>
+    <L2_Cache_Size>6 MB (6291456 B)</L2_Cache_Size>
+    <Constant_Memory>64 KB (65536 B)</Constant_Memory>
+    <Memory_Bus_Width>384 bits</Memory_Bus_Width>
+    <Peak_Memory_Bandwidth>≈768 GB/s (8001 MHz GDDR6 × 384 b / 8 = 768.1 GB/s theoretical; ECC-on slightly less in practice)</Peak_Memory_Bandwidth>
+    <GPU_Clock_Rate>2100 MHz max SM clock (from nvidia-smi); base ~1410 MHz</GPU_Clock_Rate>
+  </Hardware_Constraints>
+
+  <Data_Shape>
+    <Input_Dimensions>Runtime-parameterized: input N × H × W, output N × (H/2) × (W/2), pool = stride = 2×2. N, H, W supplied as argv[3], argv[2], argv[1].</Input_Dimensions>
+    <Data_Type>float32 (DTYPE = float, 4 B/element)</Data_Type>
+    <Total_Memory_Footprint>
+      Device: d_image = 4·N·W·H B  +  d_result = 4·N·(W/2)·(H/2) B = 1.25 · 4 · N·W·H B.
+      Host: h_image + h_output + d_output mirror = 4·N·W·H + 2·4·N·(W/2)·(H/2) = 1.5 · 4 · N·W·H B.
+      Example (N=512, W=H=1024): device ≈ 2.5 GB, host ≈ 3.0 GB; fits within the 49 GB VRAM and 188 GB RAM available.
+    </Total_Memory_Footprint>
+  </Data_Shape>
+</Context_Normalization>

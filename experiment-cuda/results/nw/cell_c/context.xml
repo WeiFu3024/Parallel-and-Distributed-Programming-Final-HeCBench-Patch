@@ -1,0 +1,120 @@
+<Context_Normalization>
+  <Problem_Classification>
+    <Domain>Bioinformatics / Dynamic Programming (Sequence Alignment)</Domain>
+    <Algorithm>Needleman-Wunsch (NW) Global Sequence Alignment</Algorithm>
+    <Algorithm_Purpose>Computes the optimal global alignment score between two sequences by filling a 2D dynamic-programming score matrix. Each cell H[i,j] = max( H[i-1,j-1] + sub(i,j),  H[i-1,j] - penalty,  H[i,j-1] - penalty ), where sub(i,j) is the substitution score from BLOSUM62. The bottom-right cell holds the optimal alignment score; an optional traceback recovers the alignment path.</Algorithm_Purpose>
+    <Algorithm_Steps>
+      1. Host initializes input_itemsets (the H matrix) with random values along row 0 and column 0, then overwrites them with gap-penalty initialization (-i*penalty / -j*penalty).
+      2. Host builds the reference (substitution) matrix by indexing BLOSUM62 with input_itemsets row/column headers.
+      3. Both arrays are copied to device memory (d_input_itemsets, d_reference).
+      4. Tiled wavefront sweep across the matrix using two diagonal phases:
+         a. Upper-left phase (kernel1): for blk = 1..block_width, launch `blk` blocks of `BLOCK_SIZE` threads. Each block processes one 16×16 tile that lies on the anti-diagonal blk; tiles in the same wavefront are independent and run in parallel.
+         b. Lower-right phase (kernel2): for blk = block_width-1..1, launch `blk` blocks; tiles cover the remaining anti-diagonals of the lower-right triangle.
+      5. Inside each kernel: thread 0 loads the NW corner from global memory; every thread loads one column (BLOCK_SIZE entries) of the reference tile and one entry of the N and W boundaries into shared memory; __syncthreads() barrier; an anti-diagonal sweep inside the tile (m = 0..BLOCK_SIZE-1, then m = BLOCK_SIZE-2..0) fills the (BLOCK_SIZE+1)×(BLOCK_SIZE+1) shared score tile with __syncthreads() between waves; finally each thread writes its column of the BLOCK_SIZE×BLOCK_SIZE result back to global memory.
+      6. After (warmup + repeat) iterations, the device result is copied back and compared against the CPU reference (nw_host); the traceback (when TRACEBACK is defined) reconstructs the alignment path from the final score matrix.
+    </Algorithm_Steps>
+    <Reference_Complexity>
+      Time:  O(N · M) cell updates with sequential anti-diagonal dependency depth O(N + M); each cell is O(1).
+      Space: O(N · M) for the H/score matrix and the reference (substitution) matrix.  Shared-memory footprint per block is O(BLOCK_SIZE²).
+    </Reference_Complexity>
+  </Problem_Classification>
+
+  <Bottleneck_Analysis>
+    <Classification>Latency-bound (with secondary memory-bandwidth pressure); strictly NOT compute-bound</Classification>
+    <Arithmetic_Intensity>
+      Per 16×16 tile, global-memory traffic:
+        Reads  = 256 (reference tile) + 1 (NW) + 16 (W column) + 16 (N row) = 289 int32 = 1156 B
+        Writes = 256 int32 = 1024 B
+        Total ≈ 2180 B per tile.
+      Compute per tile ≈ 256 cells × ~5 integer ops (one add, two subtracts, two compares in `maximum`) ≈ 1280 int-ops.
+      Arithmetic intensity ≈ 1280 / 2180 ≈ 0.59 int-ops / byte.
+      (Counting only the FMA-equivalent "useful" max-plus-add as 2 ops yields ~0.23 ops/B — same order.)
+    </Arithmetic_Intensity>
+    <Ridge_Point_Comparison>
+      RTX A6000 INT32 peak ≈ 84 SM × 64 INT32-ops/cycle × ~1.80 GHz ≈ 9.7 TIOPS.
+      Peak DRAM BW = 768 GB/s.
+      Ridge point ≈ 9700 / 768 ≈ 12.6 ops/byte.
+      Kernel AI (≈0.59 ops/B) is roughly 20× BELOW the ridge → strictly memory-bandwidth limited from a roofline standpoint.
+    </Ridge_Point_Comparison>
+    <Dominant_Limiter>
+      In practice the kernel is dominated by KERNEL-LAUNCH LATENCY and OCCUPANCY STARVATION rather than raw DRAM bandwidth:
+        • 2·(block_width − 1) + 1 kernel launches per outer iteration; each launch has only `blk` blocks of 16 threads (½ warp). For a typical 2048-element problem (block_width=128), most launches contain far fewer blocks than the 84 SMs available, especially at the start/end of each phase.
+        • Every block uses just 16 threads = 1 half-warp, so SIMT lanes are 50% wasted before any other inefficiency.
+        • The anti-diagonal wavefront imposes a serial chain of ~2·block_width kernel launches, each with __syncthreads() inside, so the critical path is launch + sync latency, not bandwidth.
+      Secondary limiter: uncoalesced/strided global stores (each thread writes BLOCK_SIZE rows separated by `max_cols`, see Memory_Access_Profile).
+    </Dominant_Limiter>
+  </Bottleneck_Analysis>
+
+  <Memory_Access_Profile>
+    <Pattern>Tiled sliding-window over a 2D matrix with anti-diagonal wavefront dependency; per-thread access to global memory is column-strided (stride = max_cols * sizeof(int)) for both the reference load and the output store, with short coalesced loads along the N boundary.</Pattern>
+    <Read_Write_Ratio>
+      Per tile: 289 reads vs 256 writes ≈ 1.13 : 1 (essentially balanced ~9:8).
+      Including the host→device copy of both buffers once and the final D→H copy of one buffer, overall read:write to DRAM across the program ≈ 1.1 : 1.
+    </Read_Write_Ratio>
+    <Reuse_Factor>
+      Reference tile entries: 1× (loaded once into shared memory, read multiple times during the in-tile wavefront; ~2 logical re-reads per cell after the initial load).
+      Score tile entries: each interior cell is read 3× (by its E, S, SE neighbors) and written 1× — all served from shared memory after initial boundary load. Net global-memory reuse factor ≈ 1× (no inter-tile reuse of H in this implementation; the NW/N/W boundaries are re-fetched by neighboring tiles).
+    </Reuse_Factor>
+    <Coalescing_Feasibility>
+      Requires transformation. As written:
+        • The reference load `d_reference[index + max_cols * ty]` has 32 threads each reading one column → already coalesced within a warp for the `tx` dimension, GOOD.
+        • The W-boundary load `d_input_itemsets[index_w + max_cols * tx]` is column-strided across threads → UNCOALESCED (stride = max_cols ints).
+        • The final write loop `d_input_itemsets[index + max_cols * ty]` writes one column per thread → 16 consecutive int writes per warp per ty, COALESCED within the warp but only 16 lanes active.
+      Fully coalescing the W load would require a transpose or rearrangement of the H buffer (or staging through shared memory differently).
+    </Coalescing_Feasibility>
+    <Optimal_Tiling_Hint>
+      Current tile = 16×16 with shared-memory cost ≈ 17·17·4 + 16·16·4 = 1156 + 1024 = 2180 B/block. Plenty of headroom.
+      Recommended: increase tile to 32×32 (uses ~33·33·4 + 32·32·4 = 8.45 KB/block, still trivially fits in 100 KB/SM), launch 32 threads/block = full warp (eliminates the 50% lane waste), and fuse the two phases or use a single persistent-block scheme with global atomics-free dependency tracking to amortize launch latency. For very large problems, consider a diagonal-major layout (skew transform) so that an entire anti-diagonal becomes a contiguous 1-D array and global accesses are fully coalesced.
+    </Optimal_Tiling_Hint>
+  </Memory_Access_Profile>
+
+  <Parallelism_Structure>
+    <Granularity>One CUDA thread = one column of a 16×16 tile (16 cells, processed serially along the in-tile wavefront). One CUDA block = one 16×16 tile of the H matrix.</Granularity>
+    <Independence>Has RAW dependency. Inter-tile: each tile depends on its N, W, and NW neighbor tiles (anti-diagonal wavefront). Intra-tile: each cell depends on its N, W, NW cells, serialized by the m-loop with __syncthreads() between waves. Tiles on the same anti-diagonal are fully independent and form the only source of parallelism.</Independence>
+    <Synchronization>
+      Intra-block: __syncthreads() — once after shared-memory loads, then once per anti-diagonal step (2·BLOCK_SIZE − 1 barriers per tile).
+      Inter-block: implicit via kernel-boundary synchronization (the host serializes anti-diagonals by launching one kernel per wavefront).
+      No atomics, no cooperative groups.
+    </Synchronization>
+    <Recommended_Block_Size>
+      Current 16 threads/block is sub-optimal on SM_86 (1 half-warp, 50% lane utilization, max 48 blocks/SM = 768 threads/SM out of 1536, ≤50% occupancy ceiling from threads alone, before shared-memory/register limits).
+      Theoretical recommendation: 32 threads/block (one warp, paired with a 32×32 tile) or 64 threads/block, which keep one warp/block fully active and approach full 1536 threads/SM occupancy on SM_86 while still fitting in shared memory and registers.
+    </Recommended_Block_Size>
+  </Parallelism_Structure>
+
+  <Hardware_Constraints>
+    <Architecture>NVIDIA Ampere (GA102)</Architecture>
+    <Compute_Capability>8.6</Compute_Capability>
+    <SM_Count>84</SM_Count>
+    <Max_Threads_Per_SM>1536</Max_Threads_Per_SM>
+    <Max_Threads_Per_Block>1024</Max_Threads_Per_Block>
+    <Warp_Size>32</Warp_Size>
+    <Shared_Memory_Per_Block>48 KB default, up to 99 KB opt-in (cudaFuncSetAttribute)</Shared_Memory_Per_Block>
+    <Shared_Memory_Per_SM>100 KB (configurable: 100 KB shared / 28 KB L1 split on SM_86)</Shared_Memory_Per_SM>
+    <Registers_Per_Block>65536 (32-bit registers)</Registers_Per_Block>
+    <Registers_Per_SM>65536 (32-bit registers)</Registers_Per_SM>
+    <L2_Cache_Size>6 MB (6291456 bytes)</L2_Cache_Size>
+    <Constant_Memory>64 KB (65536 bytes)</Constant_Memory>
+    <Memory_Bus_Width>384 bits</Memory_Bus_Width>
+    <Peak_Memory_Bandwidth>≈ 768 GB/s  (384 b × 16.002 Gbps GDDR6 ECC / 8)</Peak_Memory_Bandwidth>
+    <GPU_Clock_Rate>Boost up to 2100 MHz (per nvidia-smi); typical sustained ~1.80 GHz</GPU_Clock_Rate>
+  </Hardware_Constraints>
+
+  <Data_Shape>
+    <Input_Dimensions>
+      Square H matrix of size max_rows × max_cols, where max_rows = max_cols = atoi(argv[1]) + 1. argv[1] is constrained to a multiple of 16. Typical benchmark sizes are 1024, 2048, 4096, or 8192. Reference matrix is the same shape. The wavefront block grid is block_width × block_width where block_width = argv[1] / 16.
+    </Input_Dimensions>
+    <Data_Type>int32 (signed `int`) for input_itemsets, reference, output_itemsets, and BLOSUM62 substitution scores.</Data_Type>
+    <Total_Memory_Footprint>
+      Per buffer: max_rows · max_cols · 4 B.
+      Device-side: 2 buffers → 2 · (N+1)² · 4 B.
+      Host-side: 3 buffers (input, reference, output) → 3 · (N+1)² · 4 B.
+      Worked examples (N = argv[1]):
+        N = 1024  → device ≈ 8.4 MB, host ≈ 12.6 MB
+        N = 2048  → device ≈ 33.6 MB, host ≈ 50.4 MB
+        N = 4096  → device ≈ 134 MB, host ≈ 201 MB
+        N = 8192  → device ≈ 537 MB, host ≈ 805 MB
+      All sizes are comfortably below the 48 GB VRAM (and the 9.96 GB currently free reported by nvidia-smi) for any reasonable bioinformatics problem; the L2 cache (6 MB) can hold the working set only for N ≲ 880.
+    </Total_Memory_Footprint>
+  </Data_Shape>
+</Context_Normalization>

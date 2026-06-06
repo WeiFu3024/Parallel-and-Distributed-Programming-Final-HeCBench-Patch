@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
 """
-profile_to_xml.py — Convert Nsight Compute CSV output to Iteration_Feedback XML.
+profile_to_xml.py — Convert Nsight Compute CSV output to structured XML.
 
 Usage:
-  # Generate feedback XML (baseline + your kernel):
+  # Generate feedback XML (baseline + your kernel), all kernels shown:
   python profile_to_xml.py feedback \
       --baseline baseline/nsight_raw.csv \
       --yours    cell_c/round_1/nsight_raw.csv \
       --round 1 \
       --output   cell_c/round_2/feedback.xml
 
-  # Generate a single kernel profile XML (e.g., for baseline):
+  # Generate a full profile XML for all kernels in a single CSV:
   python profile_to_xml.py single \
       --input  baseline/nsight_raw.csv \
       --output baseline/nsight.xml
@@ -74,7 +74,7 @@ def parse_ncu_csv(filepath):
     """
     Parse ncu --set full --csv output.
     Returns: {kernel_name: {metric_name: (value_str, unit_str)}}
-    
+
     Handles the standard ncu CSV format with columns:
     ID, Process ID, Process Name, Host Name, Kernel Name,
     Context, Stream, Section Name, Metric Name, Metric Unit, Metric Value
@@ -82,7 +82,6 @@ def parse_ncu_csv(filepath):
     kernels = defaultdict(dict)
 
     with open(filepath, "r", encoding="utf-8") as f:
-        # Skip lines until we find the header row
         lines = f.readlines()
 
     header_idx = None
@@ -90,7 +89,6 @@ def parse_ncu_csv(filepath):
         if '"ID"' in line and '"Kernel Name"' in line and '"Metric Name"' in line:
             header_idx = i
             break
-        # Also try unquoted headers
         if "ID," in line and "Kernel Name" in line and "Metric Name" in line:
             header_idx = i
             break
@@ -116,68 +114,20 @@ def parse_ncu_csv(filepath):
     return dict(kernels)
 
 
-def select_kernel(kernels_dict):
-    """
-    If multiple kernels were profiled, select the one with the longest duration.
-    Returns: (kernel_name, metrics_dict)
-    """
-    if not kernels_dict:
-        print("Error: No kernel data found in CSV.", file=sys.stderr)
-        sys.exit(1)
+def sort_kernels_by_time(kernels_dict):
+    """Return list of (name, metrics) sorted by Duration descending (slowest first)."""
+    time_key = METRIC_MAP["kernel_time_ns"]
 
-    if len(kernels_dict) == 1:
-        name = list(kernels_dict.keys())[0]
-        return name, kernels_dict[name]
-
-    # Pick kernel with longest Duration
-    best_name, best_time = None, -1
-    for name, metrics in kernels_dict.items():
-        time_key = METRIC_MAP["kernel_time_ns"]
+    def duration(item):
+        _, metrics = item
         if time_key in metrics:
             try:
-                t = float(metrics[time_key][0].replace(",", ""))
-                if t > best_time:
-                    best_time = t
-                    best_name = name
-            except ValueError:
+                return float(metrics[time_key][0].replace(",", ""))
+            except (ValueError, TypeError):
                 pass
+        return 0.0
 
-    if best_name is None:
-        best_name = list(kernels_dict.keys())[0]
-
-    return best_name, kernels_dict[best_name]
-
-
-def find_kernel(kernels_dict, kernel_name=None):
-    """
-    Select a kernel from the profiled kernels dict.
-
-    If kernel_name is given, return the first kernel whose full name contains
-    kernel_name as a substring (case-sensitive).  Prints a warning and falls
-    back to the longest-duration heuristic when no match is found.
-
-    If kernel_name is None, delegates to select_kernel().
-
-    Returns: (kernel_name_str, metrics_dict)
-    """
-    if not kernel_name:
-        return select_kernel(kernels_dict)
-
-    matches = [(name, metrics) for name, metrics in kernels_dict.items()
-               if kernel_name in name]
-
-    if matches:
-        if len(matches) > 1:
-            names = [m[0] for m in matches]
-            print(f"Warning: '{kernel_name}' matches multiple kernels: {names}; "
-                  "using the first match.", file=sys.stderr)
-        return matches[0]
-
-    available = list(kernels_dict.keys())
-    print(f"Warning: kernel '{kernel_name}' not found in CSV. "
-          f"Available kernels: {available}. "
-          "Falling back to longest-duration heuristic.", file=sys.stderr)
-    return select_kernel(kernels_dict)
+    return sorted(kernels_dict.items(), key=duration, reverse=True)
 
 
 def get_metric(metrics, our_key, default="N/A"):
@@ -227,8 +177,6 @@ def occupancy_limiting_factor(metrics):
     Heuristic to determine occupancy limiting factor.
     Check if achieved << theoretical, then look at register/shared mem usage.
     """
-    # This is a simplified heuristic; ncu's occupancy section has more detail
-    # Users may want to customize this
     reg_key = "Registers Per Thread"
     smem_key = "Dynamic Shared Memory Per Block"
 
@@ -251,11 +199,11 @@ def occupancy_limiting_factor(metrics):
     return "block_size"
 
 
-def format_kernel_xml(tag_name, kernel_name, metrics, indent="  "):
-    """Format a single kernel's profile as XML."""
+def format_kernel_xml(kernel_name, metrics, indent="  ", rank=None):
+    """Format a single kernel's profile as an XML <Kernel> block."""
     i = indent
-    i2 = indent * 2
-    i3 = indent * 3
+    i2 = indent + "  "
+    i3 = indent + "    "
 
     stalls = get_stall_top3(metrics)
     limiter = occupancy_limiting_factor(metrics)
@@ -265,10 +213,11 @@ def format_kernel_xml(tag_name, kernel_name, metrics, indent="  "):
     gl_store = bytes_per_sec_to_gb(get_metric(metrics, "global_store_throughput", "0"))
     sh_thru = bytes_per_sec_to_gb(get_metric(metrics, "shared_mem_throughput", "0"))
 
-    xml = []
-    xml.append(f"{i}<{tag_name}>")
+    rank_attr = f' rank="{rank}"' if rank is not None else ""
 
-    # Execution
+    xml = []
+    xml.append(f"{i}<Kernel{rank_attr}>")
+
     xml.append(f"{i2}<Execution>")
     xml.append(f"{i3}<Kernel_Name>{kernel_name}</Kernel_Name>")
     xml.append(f"{i3}<Kernel_Time_ms>{time_ms}</Kernel_Time_ms>")
@@ -276,14 +225,12 @@ def format_kernel_xml(tag_name, kernel_name, metrics, indent="  "):
     xml.append(f"{i3}<Block_Size>{get_metric(metrics, 'block_size')}</Block_Size>")
     xml.append(f"{i2}</Execution>")
 
-    # Occupancy
     xml.append(f"{i2}<Occupancy>")
     xml.append(f"{i3}<Achieved>{get_metric(metrics, 'achieved_occupancy_pct')}%</Achieved>")
     xml.append(f"{i3}<Theoretical_Max>{get_metric(metrics, 'theoretical_occupancy_pct')}%</Theoretical_Max>")
     xml.append(f"{i3}<Limiting_Factor>{limiter}</Limiting_Factor>")
     xml.append(f"{i2}</Occupancy>")
 
-    # Memory
     xml.append(f"{i2}<Memory>")
     xml.append(f"{i3}<Global_Load_Throughput>{gl_load} GB/s</Global_Load_Throughput>")
     xml.append(f"{i3}<Global_Store_Throughput>{gl_store} GB/s</Global_Store_Throughput>")
@@ -293,14 +240,12 @@ def format_kernel_xml(tag_name, kernel_name, metrics, indent="  "):
     xml.append(f"{i3}<DRAM_Utilization>{get_metric(metrics, 'dram_utilization_pct')}%</DRAM_Utilization>")
     xml.append(f"{i2}</Memory>")
 
-    # Compute
     xml.append(f"{i2}<Compute>")
     xml.append(f"{i3}<SM_Utilization>{get_metric(metrics, 'sm_utilization_pct')}%</SM_Utilization>")
     xml.append(f"{i3}<FP32_Utilization>{get_metric(metrics, 'fp32_utilization_pct')}%</FP32_Utilization>")
     xml.append(f"{i3}<Warp_Execution_Efficiency>{get_metric(metrics, 'warp_exec_efficiency')}</Warp_Execution_Efficiency>")
     xml.append(f"{i2}</Compute>")
 
-    # Stall Analysis
     xml.append(f"{i2}<Stall_Analysis>")
     xml.append(f"{i3}<Top_Stalls>")
     for reason, pct in stalls:
@@ -310,24 +255,32 @@ def format_kernel_xml(tag_name, kernel_name, metrics, indent="  "):
     xml.append(f"{i3}</Top_Stalls>")
     xml.append(f"{i2}</Stall_Analysis>")
 
-    xml.append(f"{i}</{tag_name}>")
+    xml.append(f"{i}</Kernel>")
     return "\n".join(xml)
 
 
+def format_all_kernels_xml(kernels_dict, wrapper_tag, indent="  "):
+    """Format all kernels from a CSV as XML blocks inside wrapper_tag, sorted by time."""
+    sorted_kernels = sort_kernels_by_time(kernels_dict)
+    lines = [f"{indent}<{wrapper_tag}>"]
+    for rank, (name, metrics) in enumerate(sorted_kernels, start=1):
+        lines.append("")
+        lines.append(format_kernel_xml(name, metrics, indent=indent + "  ", rank=rank))
+    lines.append("")
+    lines.append(f"{indent}</{wrapper_tag}>")
+    return "\n".join(lines)
+
+
 def cmd_feedback(args):
-    """Generate Iteration_Feedback XML from baseline + your kernel CSV."""
+    """Generate Iteration_Feedback XML from baseline + your kernel CSV (all kernels)."""
     baseline_kernels = parse_ncu_csv(args.baseline)
     yours_kernels = parse_ncu_csv(args.yours)
 
-    base_name, base_metrics = find_kernel(baseline_kernels, args.kernel_name)
-    your_name, your_metrics = find_kernel(yours_kernels, args.kernel_name)
-
-    xml = []
-    xml.append(f'<Iteration_Feedback round="{args.round}">')
+    xml = [f'<Iteration_Feedback round="{args.round}">']
     xml.append("")
-    xml.append(format_kernel_xml("Baseline_Kernel", base_name, base_metrics))
+    xml.append(format_all_kernels_xml(baseline_kernels, "Baseline_Profile"))
     xml.append("")
-    xml.append(format_kernel_xml("Your_Kernel", your_name, your_metrics))
+    xml.append(format_all_kernels_xml(yours_kernels, "Your_Profile"))
     xml.append("")
     xml.append("</Iteration_Feedback>")
 
@@ -342,12 +295,16 @@ def cmd_feedback(args):
 
 
 def cmd_single(args):
-    """Generate a single kernel profile XML."""
+    """Generate profile XML for all kernels in a CSV, sorted by execution time."""
     kernels = parse_ncu_csv(args.input)
-    name, metrics = find_kernel(kernels, args.kernel_name)
 
-    xml = format_kernel_xml("Kernel_Profile", name, metrics, indent="  ")
-    output = f"<Nsight_Profile>\n{xml}\n</Nsight_Profile>"
+    xml = ["<Nsight_Profile>"]
+    xml.append("")
+    xml.append(format_all_kernels_xml(kernels, "Kernel_Profile", indent=""))
+    xml.append("")
+    xml.append("</Nsight_Profile>")
+
+    output = "\n".join(xml)
 
     if args.output:
         with open(args.output, "w") as f:
@@ -370,30 +327,23 @@ def cmd_discover(args):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Convert Nsight Compute CSV to Iteration_Feedback XML"
+        description="Convert Nsight Compute CSV to structured XML (all kernels)"
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     # feedback subcommand
     p_fb = subparsers.add_parser("feedback",
-        help="Generate Iteration_Feedback XML from baseline + your kernel")
+        help="Generate Iteration_Feedback XML from baseline + your kernel (all kernels)")
     p_fb.add_argument("--baseline", required=True, help="Path to baseline ncu CSV")
     p_fb.add_argument("--yours", required=True, help="Path to your kernel's ncu CSV")
     p_fb.add_argument("--round", type=int, required=True, help="Iteration round number")
     p_fb.add_argument("--output", "-o", help="Output XML path (default: stdout)")
-    p_fb.add_argument("--kernel-name", "-k", default=None, metavar="NAME",
-        help="Substring to match the target kernel name in both CSVs. "
-             "Use this when a benchmark has multiple kernels so the correct one "
-             "is selected from both --baseline and --yours. "
-             "Falls back to longest-duration heuristic when omitted or no match found.")
 
     # single subcommand
     p_si = subparsers.add_parser("single",
-        help="Generate single kernel profile XML")
+        help="Generate profile XML for all kernels in a CSV, sorted by execution time")
     p_si.add_argument("--input", required=True, help="Path to ncu CSV")
     p_si.add_argument("--output", "-o", help="Output XML path (default: stdout)")
-    p_si.add_argument("--kernel-name", "-k", default=None, metavar="NAME",
-        help="Substring to match the target kernel name (default: longest-duration kernel).")
 
     # discover subcommand
     p_di = subparsers.add_parser("discover",

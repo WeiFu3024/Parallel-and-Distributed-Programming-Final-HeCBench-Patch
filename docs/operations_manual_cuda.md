@@ -40,6 +40,28 @@ bash experiment-cuda/scripts/init_experiment.sh <HeCBench_Path> benchmark1 bench
 這會在 `experiment-cuda/results/` 下為每個 benchmark 建立完整的目錄結構，
 並從 HeCBench `src/{bench}-cuda/` 複製 baseline `.cu` 檔案。
 
+> ⚠️ **手動合併 baseline（無法自動化）**
+>
+> 以下 benchmark 的原始 HeCBench 代碼分散在多個 `.cu`/`.cpp`/`.h` 檔案中，
+> 但實驗要求 LLM 只操作單一 `main.cu`。因此這些 benchmark 的
+> `results/{bench}/baseline/main.cu` 已經過**手動合併**，將所有 GPU kernel 相關程式碼
+> inline 進單一檔案：
+>
+> | benchmark | 被合併進 `main.cu` 的原始檔 | 保留為獨立編譯的檔案 |
+> |-----------|--------------------------|-------------------|
+> | `binomial` | `kernel.cu`, `reference.cu` | — |
+> | `fluidSim` | `kernels.cu` | — |
+> | `heartwall` | `main.h`, `kernel/kernel.h`, `kernel/kernel.cu` | `util/avi/avilib.c`, `util/avi/avimod.c`, `util/file/file.c`, `util/timer/timer.c` |
+> | `mcpr` | `kernels.h`, `reference.h` | — |
+> | `sc` | `device_sc.cu`, `kernel.h`, `host_sc.cpp` | — |
+> | `sssp` | `kernel.cu` | — |
+>
+> 若要新增這些 benchmark 的新 attempt（cell A/B/C），LLM 產出的也應是單一 `main.cu`，
+> 其中包含完整的 kernel code。`compile.sh` 的 `EXTRA_SRCS` 已對應調整。
+>
+> `heartwall` 的 AVI/timer/file utility files 是 I/O 基礎設施，不是 CUDA 優化目標，
+> 因此仍保留為獨立 `.c` 檔案透過 `compile.sh` 連結。
+
 ### Step 0.3：Profile baseline kernel
 
 **所有指令均從 HeCBench 根目錄執行。**
@@ -61,52 +83,50 @@ ncu --set full --csv \
     --log-file experiment-cuda/results/{benchmark}/baseline/nsight_raw.csv \
     experiment-cuda/results/{benchmark}/baseline/main [arguments]
 
-# 4. 轉成標準 XML（備用）；用 --kernel-name 指定目標 kernel 避免選錯
+# 4. 轉成 XML（所有 kernel 依執行時間排序）
 python experiment-cuda/scripts/profile_to_xml.py single \
     --input  experiment-cuda/results/{benchmark}/baseline/nsight_raw.csv \
-    --output experiment-cuda/results/{benchmark}/baseline/nsight.xml \
-    --kernel-name [target_kernel_name]
+    --output experiment-cuda/results/{benchmark}/baseline/nsight.xml
 ```
 
-各 benchmark 的標準引數與目標 kernel 名稱：
+各 benchmark 的標準引數：
 
-| benchmark | HeCBench 目錄 | arguments | `--kernel-name` |
-|-----------|-------------|-----------|-----------------|
-| attention | attention-cuda | `65536 2048 0 1000` | discover 後填入 |
-| attention-paged | attention-paged-cuda | `8 32 128 4096 128 100` | discover 後填入 |
-| blas-gemm | blas-gemm-cuda | `4096 4096 4096 100` | `matrix_mul` |
-| convolution3D | convolution3D-cuda | `32 96 256 26 26 5 100` | discover 後填入 |
-| layernorm | layernorm-cuda | `8 1024 768 2000` | discover 後填入 |
-| maxpool3d | maxpool3d-cuda | `2048 2048 96 100` | （單一，可省略） |
-| bilateral | bilateral-cuda | `2960 1440 0.5 0.5 1000` | `bilateralFilter` |
-| black-scholes | black-scholes-cuda | `100` | `getOutValOption` |
-| binomial | binomial-cuda | （無引數） | `binomialOptionsKernel` |
-| fft | fft-cuda | `3 100` | `fft1D_512` |
-| jacobi | jacobi-cuda | （無引數） | `jacobi_step` |
-| mcpr ¹ | mcpr-cuda | `<src_dir>/alphas.csv 10` | discover 後填入 |
-| bh | bh-cuda | `100000 100` | discover 後填入 |
-| hotspot ² | hotspot-cuda | `512 2 200 <HeCBench_Path>/data/hotspot/temp_512 <HeCBench_Path>/data/hotspot/power_512 output.out` | `calc_temp` |
-| fluidSim | fluidSim-cuda | `10000` | `lbm` |
-| d2q9-bgk ³ | d2q9-bgk-cuda | `<src_dir>/Inputs/input_256x256.params <src_dir>/Obstacles/obstacles_256x256.dat` | `d2q9_bgk` |
-| heartwall ² | heartwall-cuda | `104` | discover 後填入 |
-| bfs ² | bfs-cuda | `<HeCBench_Path>/data/bfs/graph1MW_6.txt` | discover 後填入 |
-| page-rank | page-rank-cuda | `-n 20000 -i 100` | discover 後填入 |
-| sssp | sssp-cuda | `-g 120 -t 1 -w 10 -r 100` | `SSSP_gpu` |
-| nw | nw-cuda | `16384 10 100` | discover 後填入 |
-| mis | mis-cuda | `<src_dir>/internet.egr 100` | discover 後填入 |
-| scan | scan-cuda | `268435456 100` | discover 後填入 |
-| bscan | bscan-cuda | `1000` | `binary_scan` |
-| histogram | histogram-cuda | `--i=100` | discover 後填入 |
-| segment-reduce | segment-reduce-cuda | `16384 100` | （單一，可省略） |
-| sc | sc-cuda | `-a 0.1` | （單一，可省略） |
-| sort | sort-cuda | `3 100` | discover 後填入 |
-| transpose ⁴ | matrixT-cuda | `16384 16384 200` | discover 後填入 |
-| lzss ⁵ | lzss-cuda | `-i <inputfile> -n 10` | discover 後填入 |
+| benchmark | HeCBench 目錄 | arguments |
+|-----------|-------------|-----------|
+| attention | attention-cuda | `65536 2048 0 1000` |
+| attention-paged | attention-paged-cuda | `8 32 128 4096 128 100` |
+| blas-gemm | blas-gemm-cuda | `4096 4096 4096 100` |
+| convolution3D | convolution3D-cuda | `32 96 256 26 26 5 100` |
+| layernorm | layernorm-cuda | `8 1024 768 2000` |
+| maxpool3d | maxpool3d-cuda | `2048 2048 96 100` |
+| bilateral | bilateral-cuda | `2960 1440 0.5 0.5 1000` |
+| black-scholes | black-scholes-cuda | `100` |
+| binomial | binomial-cuda | （無引數） |
+| fft | fft-cuda | `3 100` |
+| jacobi | jacobi-cuda | （無引數） |
+| mcpr ¹ | mcpr-cuda | `<src_dir>/alphas.csv 10` |
+| bh | bh-cuda | `100000 100` |
+| hotspot ² | hotspot-cuda | `512 2 200 <HeCBench_Path>/data/hotspot/temp_512 <HeCBench_Path>/data/hotspot/power_512 output.out` |
+| fluidSim | fluidSim-cuda | `10000` |
+| d2q9-bgk ³ | d2q9-bgk-cuda | `<src_dir>/Inputs/input_256x256.params <src_dir>/Obstacles/obstacles_256x256.dat` |
+| heartwall ² | heartwall-cuda | `104` |
+| bfs ² | bfs-cuda | `<HeCBench_Path>/data/bfs/graph1MW_6.txt` |
+| page-rank | page-rank-cuda | `-n 20000 -i 100` |
+| sssp | sssp-cuda | `-g 120 -t 1 -w 10 -r 100` |
+| nw | nw-cuda | `16384 10 100` |
+| mis | mis-cuda | `<src_dir>/internet.egr 100` |
+| scan | scan-cuda | `268435456 100` |
+| bscan | bscan-cuda | `1000` |
+| histogram | histogram-cuda | `--i=100` |
+| segment-reduce | segment-reduce-cuda | `16384 100` |
+| sc | sc-cuda | `-a 0.1` |
+| sort | sort-cuda | `3 100` |
+| transpose ⁴ | matrixT-cuda | `16384 16384 200` |
+| lzss ⁵ | lzss-cuda | `-i <inputfile> -n 10` |
 
 **備註：**
 
 - `<src_dir>` = `<HeCBench_Path>/src/{benchmark}-cuda`
-- `discover 後填入` = 該 benchmark 有多個 kernel，先用 `profile_to_xml.py discover` 確認最耗時的 kernel 名稱後填入
 
 ¹ **mcpr**：`alphas.csv.bz2` 附於 `src/mcpr-cuda/`，先解壓縮：
   `cd <HeCBench_Path>/src/mcpr-cuda && bzip2 -dk alphas.csv.bz2`
@@ -249,6 +269,7 @@ code, state your reasoning and best estimate.
     <Total_Memory_Footprint>[Estimated total bytes for all buffers]</Total_Memory_Footprint>
   </Data_Shape>
 
+
 </Context_Normalization>
 </Template>
 
@@ -290,7 +311,7 @@ Do not include explanatory text outside of code comments.
 ### User Prompt：
 
 ```
-Optimize the following CUDA kernel for maximum GPU performance.
+Optimize the following CUDA code for maximum GPU performance.
 
 <Source_Code>
 [在此貼上 baseline/main.cu 的完整內容]
@@ -299,7 +320,7 @@ Optimize the following CUDA kernel for maximum GPU performance.
 
 ### LLM 回覆後：
 
-將 LLM 輸出的 `.cu` 存到 `experiment-cuda/results/{benchmark}/cell_a/round_1/attempt_1/main.cu`，然後執行：
+確認 LLM 輸出的 `.cu` 存到 `experiment-cuda/results/{benchmark}/cell_a/round_1/attempt_1/main.cu`，然後執行：
 
 1. 編譯：
    ```bash
@@ -321,7 +342,6 @@ Optimize the following CUDA kernel for maximum GPU performance.
    cp experiment-cuda/results/{benchmark}/cell_a/round_1/attempt_1/main.cu \
       experiment-cuda/results/{benchmark}/cell_a/round_1/final.cu
 
-   # Profile；--kernel-name 為 ncu 的可選 flag，可縮小 CSV 只含目標 kernel
    ncu --set full --csv \
        --log-file experiment-cuda/results/{benchmark}/cell_a/round_1/nsight_raw.csv \
        experiment-cuda/results/{benchmark}/cell_a/round_1/attempt_1/main [arguments]
@@ -342,11 +362,11 @@ Optimize the following CUDA kernel for maximum GPU performance.
 ### User Prompt：
 
 ```
-Use the following hardware and algorithmic context to guide your optimization:
+Use the following hardware and algorithmic context to guide your optimization.
 
 [在此貼上 cell_b/context.xml 的完整內容]
 
-Optimize the following CUDA kernel for maximum GPU performance.
+Optimize the following CUDA code for maximum GPU performance.
 
 <Source_Code>
 [在此貼上 baseline/main.cu 的完整內容]
@@ -371,11 +391,11 @@ Optimize the following CUDA kernel for maximum GPU performance.
 **User Prompt：** 與 Cell B 完全相同：
 
 ```
-Use the following hardware and algorithmic context to guide your optimization:
+Use the following hardware and algorithmic context to guide your optimization.
 
 [在此貼上 cell_c/context.xml 的完整內容]
 
-Optimize the following CUDA kernel for maximum GPU performance.
+Optimize the following CUDA code for maximum GPU performance.
 
 <Source_Code>
 [在此貼上 baseline/main.cu 的完整內容]
@@ -391,7 +411,7 @@ bash experiment-cuda/scripts/compile.sh <HeCBench_Path> {benchmark} cell_c 1 1
 # 2. 驗證
 bash experiment-cuda/scripts/validate.sh <HeCBench_Path> {benchmark} cell_c 1 1
 
-# 3. Profile；kernel 選擇由後續 profile_to_xml.py --kernel-name 控制（見 Round 2 feedback 指令）
+# 3. Profile
 ncu --set full --csv \
     --log-file experiment-cuda/results/{benchmark}/cell_c/round_1/nsight_raw.csv \
     experiment-cuda/results/{benchmark}/cell_c/round_1/attempt_1/main [arguments]
@@ -415,24 +435,20 @@ python experiment-cuda/scripts/profile_to_xml.py feedback \
     --baseline experiment-cuda/results/{benchmark}/baseline/nsight_raw.csv \
     --yours    experiment-cuda/results/{benchmark}/cell_c/round_1/nsight_raw.csv \
     --round 1 \
-    --kernel-name [target_kernel_name] \
     --output   experiment-cuda/results/{benchmark}/cell_c/round_2/feedback.xml
 ```
-
-> **注意（多 kernel benchmark）**：`profile_to_xml.py` 預設以 `Duration` 最長的 kernel
-> 作為代表，多 kernel 時可能選錯（例如 accuracy benchmark 的 `accuracy_kernel` 被選中
-> 而非 `accuracy_kernel2`）。請在 `feedback` 指令加上 `--kernel-name` 指定目標 kernel。
 
 **User Prompt（在同一對話中貼出）：**
 
 ```
-Your previous kernel has been profiled. Below are the full Nsight Compute
-results for both the baseline kernel and your kernel:
+Your previous kernels have been profiled. Below are the full Nsight Compute
+results for both the baseline and your version. Kernels are listed in order
+of execution time (slowest first).
 
-[在此貼上 cell_c/round_2/feedback.xml 的完整內容]
+[在此貼上 feedback.xml 的完整內容]
 
-Based on this profiling data, produce an improved version of the kernel.
-Output only the complete, compilable CUDA source code.
+Based on this profiling data, produce an improved version of the complete CUDA
+source. Output only the complete, compilable CUDA source code.
 ```
 
 LLM 回覆後：
@@ -463,20 +479,20 @@ python experiment-cuda/scripts/profile_to_xml.py feedback \
     --baseline experiment-cuda/results/{benchmark}/baseline/nsight_raw.csv \
     --yours    experiment-cuda/results/{benchmark}/cell_c/round_2/nsight_raw.csv \
     --round 2 \
-    --kernel-name [target_kernel_name] \
     --output   experiment-cuda/results/{benchmark}/cell_c/round_3/feedback.xml
 ```
 
 **User Prompt（同一對話）：**
 
 ```
-Your previous kernel has been profiled. Below are the full Nsight Compute
-results for both the baseline kernel and your kernel:
+Your previous kernels have been profiled. Below are the full Nsight Compute
+results for both the baseline and your version. Kernels are listed in order
+of execution time (slowest first).
 
 [在此貼上 cell_c/round_3/feedback.xml 的完整內容]
 
-Based on this profiling data, produce an improved version of the kernel.
-Output only the complete, compilable CUDA source code.
+Based on this profiling data, produce an improved version of the complete CUDA
+source. Output only the complete, compilable CUDA source code.
 ```
 
 LLM 回覆後：

@@ -1,0 +1,93 @@
+<Context_Normalization>
+  <Problem_Classification>
+    <Domain>Parallel primitives / Data-parallel building blocks (GPGPU)</Domain>
+    <Algorithm>Block-wide binary (predicated) exclusive prefix sum (scan), implemented with a 3-phase warp-aggregated scan (Harris &amp; Garland, Fermi-style)</Algorithm>
+    <Algorithm_Purpose>For each element x in a per-block input array, compute the exclusive count of elements before it that satisfy a predicate (here valid(x) ≡ x &gt; 0). Output[i] = number of valid elements in input[0..i-1]. This is the core "stream compaction / filter" primitive used to compute output indices for predicated writes.</Algorithm_Purpose>
+    <Algorithm_Steps>
+      1. Each thread loads one int g_idata[threadIdx.x] and evaluates the predicate p = (x &gt; 0).
+      2. (Phase A) binary_warp_scan: each warp uses __ballot_sync to obtain a 32-bit mask of predicates within the warp, then masks it with lanemask_lt() and applies __popc to obtain an exclusive intra-warp count (warpPrefix).
+      3. (Phase B) The last lane of each warp (laneIdx == 31) writes the inclusive warp total (warpPrefix + predicate) into sdata[warpIdx]; __syncthreads().
+      4. (Phase C) The first warp (idx &lt; 32) performs an exclusive Hillis-Steele warp_scan over the warp-partial totals stored in sdata[], using a doubled shared-memory buffer with zero-padded prefix to avoid branches; __syncthreads().
+      5. (Phase D) Each thread adds its warp's exclusive partial total sdata[warpIdx] to its intra-warp prefix warpPrefix and stores the result to g_odata[threadIdx.x].
+      Host side: launches the kernel with grid = 12*7*8*9*10 = 60480 blocks of N threads each (N ∈ {32,64,128,256,512,1024}); every block redundantly scans the same N-element array (only threadIdx.x is used, not blockIdx.x) — this is a throughput micro-benchmark, not a full-array scan.
+    </Algorithm_Steps>
+    <Reference_Complexity>
+      Time: O(N) work, O(log N) depth per block (warp scan = 5 shifts, partial scan = 5 shifts → total ≈ 2·log2(warpSize) = 10 sequential SHMEM rounds). Across the launched grid: O(grid_size · N) total work due to redundant blocks.
+      Space: O(N) global I/O per block; O(2·(N/warpSize)) ints of shared memory per block (sdata[64] = 256 B fixed).
+    </Reference_Complexity>
+  </Problem_Classification>
+
+  <Bottleneck_Analysis>
+    <Classification>Mixed — primarily latency/occupancy-bound for small N (32–128); transitions to memory-bandwidth-bound for N ≥ 256 once the same 4·N-byte input is cached in L1/L2 and reused across all 60480 blocks. Effective arithmetic intensity vs. DRAM is artificially huge because of redundant reuse; vs. L1/L2 it remains low.</Classification>
+    <Arithmetic_Intensity>
+      Per element (per thread):
+        Global mem traffic: 4 B read + 4 B write = 8 B.
+        Shared mem traffic: ~6 reads + 6 writes in warp_scan (only executed by first warp), 1 write in phase B (one lane/warp), 1 read in phase D → amortized ≈ 1–2 SHMEM ops/thread.
+        Integer ops: predicate cmp (1), ballot (1), popc (1), 2 adds in phase D, plus addressing → ≈ 5–10 int-ops/thread.
+      ⇒ AI ≈ 5–10 int-ops / 8 B ≈ 0.6–1.25 ops/byte against DRAM (first-touch).
+      With redundant reuse across 60480 blocks reading the same N·4 B from L2: effective DRAM AI explodes (data is loaded once and reused), so the kernel actually runs against L1/L2 bandwidth, not HBM. Against on-chip caches AI is still ≈ 1 op/byte.
+    </Arithmetic_Intensity>
+    <Ridge_Point_Comparison>
+      RTX A6000 peak FP32 ≈ 38.7 TFLOP/s, peak DRAM BW ≈ 768 GB/s → FP32 ridge ≈ 50 FLOP/B. For 32-bit integer add throughput (~½ FP32 rate on GA10x, ≈ 19 TIOP/s), the INT ridge ≈ 25 ops/B. The kernel's ≈1 op/B is far below either ridge → Below ridge point → bandwidth/latency-limited, not compute-limited.
+    </Ridge_Point_Comparison>
+    <Dominant_Limiter>
+      For N = 32,64: occupancy / launch-and-sync latency — only 1–2 warps per block, __syncthreads() serializes phases, and small blocks cannot saturate 1536 threads/SM on GA10x.
+      For N = 128–1024: shared-memory throughput in phase A's warp_scan and __syncthreads() barrier latency dominate; global memory becomes secondary because the 4·N B input fits in L1 (128 KB/SM) and is reused 60480× across the grid.
+      No real DRAM-bandwidth pressure in this benchmark configuration.
+    </Dominant_Limiter>
+  </Bottleneck_Analysis>
+
+  <Memory_Access_Profile>
+    <Pattern>Streaming, perfectly unit-stride within a block (g_idata[threadIdx.x], g_odata[threadIdx.x]); cross-block: every block re-reads the identical N-element input (degenerate "broadcast" reuse).</Pattern>
+    <Read_Write_Ratio>1:1 (one 4-byte load and one 4-byte store per thread in global memory).</Read_Write_Ratio>
+    <Reuse_Factor>
+      Per-element global reuse within a single block: 1× (read once, written once).
+      Effective grid-level reuse: 60480× (every block reads the same array — pathological reuse due to missing blockIdx.x indexing). Shared-memory reuse: sdata[warpIdx] is written once and read by all 32 threads in the warp = 32× reuse in SHMEM.
+    </Reuse_Factor>
+    <Coalescing_Feasibility>Natural — consecutive threads access consecutive 4-byte words; one 128-byte sector per warp for both load and store.</Coalescing_Feasibility>
+    <Optimal_Tiling_Hint>
+      Already block-tiled by construction (1 element/thread, 1 block = 1 tile of N elements). Shared memory footprint is tiny and fixed: sdata[64] = 256 B/block. Recommended tile = full block = up to 1024 threads. For real (non-benchmark) use over large arrays: have each block process T elements/thread (e.g., T = 4–8) with a thread-local sequential scan + one block scan of partials, reducing __syncthreads() cost and amortizing global load latency. Use cub::BlockScan or a 2-level (block + device) scan with carry-in for arrays larger than one block.
+    </Optimal_Tiling_Hint>
+  </Memory_Access_Profile>
+
+  <Parallelism_Structure>
+    <Granularity>1 element per thread; 1 block scans N elements (N ∈ {32,64,128,256,512,1024}).</Granularity>
+    <Independence>Has RAW (prefix) dependency along the scan axis — resolved hierarchically: lock-step within a warp via __ballot_sync (warp-implicit sync), then across warps via shared memory + __syncthreads(); blocks are fully independent of each other.</Independence>
+    <Synchronization>Two __syncthreads() barriers per block (after phase B and after phase C); intra-warp synchronization via __ballot_sync(mask, p) (CUDA ≥ 9.0) implicitly synchronizes the participating lanes. No global atomics, no device-wide sync.</Synchronization>
+    <Recommended_Block_Size>
+      For GA10x (CC 8.6, max 1536 threads/SM, max 16 blocks/SM): 256 or 512 threads/block typically maximize occupancy (6 blocks × 256 = 1536, or 3 × 512 = 1536). N=1024 gives only 1 block/SM (1024/1536 = 67% occupancy). N=32 wastes the SM (need 16 concurrent blocks just to fill it, and the __syncthreads() per warp-sized block is wasteful). Theoretically optimal for this benchmark: 256 threads.
+    </Recommended_Block_Size>
+  </Parallelism_Structure>
+
+  <Hardware_Constraints>
+    <Architecture>NVIDIA Ampere (GA102), RTX A6000</Architecture>
+    <Compute_Capability>8.6</Compute_Capability>
+    <SM_Count>84</SM_Count>
+    <Max_Threads_Per_SM>1536</Max_Threads_Per_SM>
+    <Max_Threads_Per_Block>1024</Max_Threads_Per_Block>
+    <Warp_Size>32</Warp_Size>
+    <Shared_Memory_Per_Block>48 KB default, opt-in up to 100 KB (49152 B / 102400 B)</Shared_Memory_Per_Block>
+    <Shared_Memory_Per_SM>100 KB (102400 B) configurable unified L1/SHMEM out of 128 KB</Shared_Memory_Per_SM>
+    <Registers_Per_Block>65536 (32-bit registers)</Registers_Per_Block>
+    <Registers_Per_SM>65536 (32-bit registers)</Registers_Per_SM>
+    <L2_Cache_Size>6 MB (6291456 B)</L2_Cache_Size>
+    <Constant_Memory>64 KB (65536 B)</Constant_Memory>
+    <Memory_Bus_Width>384 bits</Memory_Bus_Width>
+    <Peak_Memory_Bandwidth>≈ 768 GB/s (384 bit × 16 Gbps GDDR6 ÷ 8 = 768 GB/s; nvidia-smi reports 8001 MHz × 2 data-rate × 48 B/cycle)</Peak_Memory_Bandwidth>
+    <GPU_Clock_Rate>2100 MHz max SM clock (nvidia-smi); base ≈ 1455 MHz, boost ≈ 1800 MHz typical</GPU_Clock_Rate>
+  </Hardware_Constraints>
+
+  <Data_Shape>
+    <Input_Dimensions>1-D arrays of length N, with N ∈ {32, 64, 128, 256, 512, 1024} (six independent benchmark instantiations via the bscan&lt;N&gt; template). Launched on a 1-D grid of 12·7·8·9·10 = 60480 blocks, each processing the same N elements.</Input_Dimensions>
+    <Data_Type>int32 (signed 32-bit integer) for both input and output; predicate is bool (x &gt; 0).</Data_Type>
+    <Total_Memory_Footprint>
+      Device buffers: d_in (N·4 B) + d_out (N·4 B) = 8·N B.
+        N=32   → 256 B,   N=64   → 512 B,
+        N=128  → 1 KB,    N=256  → 2 KB,
+        N=512  → 4 KB,    N=1024 → 8 KB.
+      Host buffers (stack): h_in + h_out + ref_out = 12·N B (≤ 12 KB).
+      Per-block shared memory: sdata[64] = 256 B (fixed regardless of N).
+      All buffers fit comfortably in a single SM's L1 (128 KB) and in L2 (6 MB), which is why the 60480-block redundant grid behaves as an on-chip-cache benchmark rather than a DRAM benchmark.
+    </Total_Memory_Footprint>
+  </Data_Shape>
+</Context_Normalization>

@@ -1,0 +1,109 @@
+<Context_Normalization>
+  <Problem_Classification>
+    <Domain>Graph Analytics / Sparse Graph Traversal</Domain>
+    <Algorithm>Level-synchronous (Quadratic-style) Parallel Breadth-First Search</Algorithm>
+    <Algorithm_Purpose>Compute the shortest unweighted distance (hop count) from a source vertex to every reachable vertex in a directed graph represented in CSR-like form (Node {starting, no_of_edges} + edge array).</Algorithm_Purpose>
+    <Algorithm_Steps>
+      1. Host reads graph in CSR-like layout (Node array of {offset, degree}, flat edge array), allocates frontier mask, update mask, visited mask, cost array.
+      2. Source vertex is marked in graph_mask and graph_visited; cost[source]=0.
+      3. Iterative level-synchronous loop on device until no updates occur:
+         a. Kernel #1 (one thread per vertex, tid in [0,N)): if vertex is in the current frontier (graph_mask[tid]==1), clear its mask bit, iterate its outgoing edges [starting, starting+no_of_edges); for each neighbor id, if not visited, write cost[id]=cost[tid]+1 and set updating_graph_mask[id]=1.
+         b. Kernel #2 (one thread per vertex): if updating_graph_mask[tid]==1, set graph_mask[tid]=1, graph_visited[tid]=1, clear updating bit, and raise d_over flag.
+         c. Host copies d_over back; if set, repeat.
+      4. Result cost[] is copied back and verified against a serial CPU BFS reference.
+    </Algorithm_Steps>
+    <Reference_Complexity>
+      Time: O((V + E) * D) work on GPU across D BFS levels in the worst case because every vertex is inspected at every level (vertex-parallel "quadratic" formulation, not work-efficient frontier compaction). Sequential reference is O(V + E).
+      Space: O(V + E) — Node[V], edges[E], three char masks[V], cost[V] on both host and device.
+    </Reference_Complexity>
+  </Problem_Classification>
+
+  <Bottleneck_Analysis>
+    <Classification>Memory-bound, with strong latency-bound characteristics due to irregular indirect accesses and very low active-thread density on most BFS levels.</Classification>
+    <Arithmetic_Intensity>
+      Per active frontier vertex with degree d, Kernel #1 performs roughly:
+        Bytes touched ≈ sizeof(Node)=8 + sizeof(char) graph_mask read+write =2 + d*(edge read 4 + visited read 1 + cost write 4 + updating write 1 + cost[tid] read 4 amortized) ≈ 10 + 14·d bytes.
+        Integer/branch ops ≈ ~6 + 6·d (address arithmetic, comparisons, increment, two stores per neighbor).
+        Floating-point ops = 0.
+      FLOP/Byte = 0/X = 0. Treating integer-ops/byte instead: ≈ 6·d / 14·d ≈ 0.43 ops/byte. This is extraordinarily low — far below any compute roofline.
+    </Arithmetic_Intensity>
+    <Ridge_Point_Comparison>
+      RTX A6000 ridge point ≈ FP32 peak (≈ 38.7 TFLOPS) / peak BW (≈ 768 GB/s) ≈ 50 FLOP/byte. The kernel sits at effectively 0 FLOP/byte — many orders of magnitude below the ridge → unambiguously on the bandwidth-limited (and worse, latency-limited) side of the roofline.
+    </Ridge_Point_Comparison>
+    <Dominant_Limiter>
+      Global-memory latency from uncoalesced/gather loads of d_graph_visited[id] and scatter writes to d_cost[id] / d_updating_graph_mask[id], plus very poor warp efficiency: on each level only a tiny fraction of threads pass the d_graph_mask[tid] gate, so most warps issue a wasted load-then-exit. Workload imbalance across threads of a warp (very different degrees → divergent inner-loop trip counts) is a strong secondary limiter. DRAM bandwidth is reached only on the largest frontier levels; small-frontier levels are dominated by kernel-launch + cudaMemcpy(d_over) round-trip latency.
+    </Dominant_Limiter>
+  </Bottleneck_Analysis>
+
+  <Memory_Access_Profile>
+    <Pattern>Mixed: streaming + coalesced for per-tid arrays (graph_mask, graph_nodes, cost[tid]); gather-scatter for neighbor-indexed accesses (graph_visited[id], cost[id], updating_graph_mask[id]); contiguous-within-thread but warp-strided for d_graph_edges[starting..starting+deg).</Pattern>
+    <Read_Write_Ratio>Approximately 2:1. Per active vertex of degree d: ~ (8+1+4d+d) = 9+5d bytes read vs (1+4d+d) = 1+5d bytes written in Kernel #1; Kernel #2 reads 1 and writes ~3 bytes per matched tid. Aggregate ≈ 2 reads per 1 write.</Read_Write_Ratio>
+    <Reuse_Factor>
+      Within a single kernel launch: ~1 (each datum touched at most once per thread; no shared-memory or register caching).
+      Across BFS levels: d_graph_nodes and d_graph_edges are reused D times (D = BFS depth), but only through L2/L1 — no explicit reuse mechanism in code. cost[tid] is read once per level the vertex stays in frontier.
+    </Reuse_Factor>
+    <Coalescing_Feasibility>
+      Mixed. graph_mask[tid], graph_nodes[tid], cost[tid] are naturally coalesced. d_graph_edges[i] is per-thread sequential but inter-thread strided by widely varying offsets (uncoalesced across the warp). d_graph_visited[id], d_cost[id], d_updating_graph_mask[id] are inherently gather/scatter on neighbor IDs — coalescing not feasible without algorithmic restructuring (e.g., edge-centric parallelism with sorted edges, or frontier compaction + warp/CTA-cooperative neighbor processing à la Merrill-Garland).
+    </Coalescing_Feasibility>
+    <Optimal_Tiling_Hint>
+      No classical tiling applies (irregular sparse access). Recommended structural changes instead: (1) Edge-parallel formulation: launch one thread per edge of the current frontier, using prefix-sum to build a per-warp/CTA work queue → coalesced loads of d_graph_edges. (2) Use the bitwise/char mask in shared memory only as a per-block scratch for vertex-degree binning (e.g., bin vertices into "small/medium/large degree" and process each bin with thread/warp/CTA granularity). (3) Cache the level's frontier as a compact queue (int*) in global memory to remove the 1-bit-per-vertex scan that wastes >99% of threads on deep/narrow graphs. Estimated shared-memory budget for binning scheme: ~4–8 KB per block (queue indices + small bin) — well within the 100 KB/SM CC-8.6 limit.
+    </Optimal_Tiling_Hint>
+  </Memory_Access_Profile>
+
+  <Parallelism_Structure>
+    <Granularity>One CUDA thread per graph vertex (tid in [0, no_of_nodes)). The thread serially walks all outgoing edges of its vertex inside an inner for-loop, so per-thread work is proportional to vertex degree d_i — highly imbalanced for power-law graphs.</Granularity>
+    <Independence>Independent within a kernel launch with respect to the write set, but with benign races: multiple frontier vertices may discover the same neighbor in the same level and concurrently write the same value to d_cost[id] and d_updating_graph_mask[id]. Because all writers in the same level write the same cost value (cost[tid]+1 is uniform per level only when BFS is truly level-synchronous, which this code approximates by gating with d_graph_visited that is updated only in Kernel #2), the data race is benign on this hardware (no torn writes for aligned 4-byte ints). Between Kernel #1 and Kernel #2 there is a RAW dependency on updating_graph_mask/graph_visited, resolved by the kernel-launch boundary.</Independence>
+    <Synchronization>No __syncthreads(), no atomics. Cross-iteration synchronization is the kernel-launch barrier; termination is a single-byte d_over flag updated by Kernel #2 and read back via cudaMemcpy each iteration (host-side polling, blocking copy).</Synchronization>
+    <Recommended_Block_Size>
+      256 threads/block (as already used) is close to optimal for CC 8.6: 1536 max threads/SM ÷ 256 = 6 resident blocks/SM (fits within 16 blocks/SM and 65536 regs/SM limits assuming ≤ ~42 registers/thread). 128 is a viable alternative if register pressure causes occupancy loss; 512 would halve resident blocks to 3 and reduce latency-hiding flexibility. So keep 256.
+    </Recommended_Block_Size>
+  </Parallelism_Structure>
+
+  <Hardware_Constraints>
+    <Architecture>NVIDIA Ampere (GA102)</Architecture>
+    <Compute_Capability>8.6</Compute_Capability>
+    <SM_Count>84</SM_Count>
+    <Max_Threads_Per_SM>1536</Max_Threads_Per_SM>
+    <Max_Threads_Per_Block>1024</Max_Threads_Per_Block>
+    <Warp_Size>32</Warp_Size>
+    <Shared_Memory_Per_Block>Up to 99 KB opt-in; 48 KB default static allocation (CC 8.6).</Shared_Memory_Per_Block>
+    <Shared_Memory_Per_SM>100 KB (combined L1/shared, configurable)</Shared_Memory_Per_SM>
+    <Registers_Per_Block>65536</Registers_Per_Block>
+    <Registers_Per_SM>65536</Registers_Per_SM>
+    <L2_Cache_Size>6 MB (6291456 bytes)</L2_Cache_Size>
+    <Constant_Memory>65536 bytes (64 KB)</Constant_Memory>
+    <Memory_Bus_Width>384 bits</Memory_Bus_Width>
+    <Peak_Memory_Bandwidth>≈ 768 GB/s (384 bits × 8001 MHz × 2 / 8 = 768.096 GB/s, GDDR6)</Peak_Memory_Bandwidth>
+    <GPU_Clock_Rate>2100 MHz (max SM clock from nvidia-smi)</GPU_Clock_Rate>
+  </Hardware_Constraints>
+
+  <Data_Shape>
+    <Input_Dimensions>
+      no_of_nodes = V (runtime-read from input file, unbounded by source code)
+      edge_list_size = E (runtime-read)
+      Source vertex hard-coded to 0 (the fscanf'd source value is overwritten by `source=0;`).
+      Per-vertex Node record: {int starting; int no_of_edges;} = 8 B.
+      Edge entry: int neighbor id (4 B; the per-edge "cost" field is read and discarded — graph is treated as unweighted).
+    </Input_Dimensions>
+    <Data_Type>
+      Vertex offsets/degrees, edge targets, cost array: int32.
+      graph_mask, updating_graph_mask, graph_visited, d_over: int8 (char) used as boolean.
+      No floating-point data.
+    </Data_Type>
+    <Total_Memory_Footprint>
+      Per side (host and device each allocate the same footprint):
+        Node array:           8·V bytes
+        Edge array:           4·E bytes
+        graph_mask:           1·V bytes
+        updating_graph_mask:  1·V bytes
+        graph_visited:        1·V bytes
+        cost:                 4·V bytes
+        d_over (device only): 1 byte
+      ⇒ Device total ≈ 15·V + 4·E + 1 bytes; host total (incl. h_cost_ref) ≈ 19·V + 4·E bytes.
+      Concrete examples:
+        V = 1,000,000, E = 6,000,000 (avg degree 6) → ~39 MB device, ~43 MB host — fits trivially in the 48 GB VRAM (≈9.7 GB free reported).
+        V = 16,000,000, E = 128,000,000 → ~752 MB device, ~816 MB host — still fits.
+      Exact footprint is undetermined from source alone; depends entirely on the input file passed at runtime.
+    </Total_Memory_Footprint>
+  </Data_Shape>
+</Context_Normalization>

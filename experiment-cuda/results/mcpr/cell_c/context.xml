@@ -1,0 +1,100 @@
+<Context_Normalization>
+  <Problem_Classification>
+    <Domain>Monte Carlo Simulation / Discrete Choice Modeling (Econometrics / Statistics)</Domain>
+    <Algorithm>Simulated Multinomial Probit Choice Probabilities (argmax-of-utilities Monte Carlo estimator)</Algorithm>
+    <Algorithm_Purpose>For each of n observations, estimate the probability that each of K alternatives yields the maximum latent utility W_k = alpha_{i,k} + epsilon_k (epsilon ~ N(0,1)), by simulating M draws and counting argmax frequencies. Output is an n×K matrix of choice probabilities.</Algorithm_Purpose>
+    <Algorithm_Steps>
+      1. Host reads n×K alpha matrix from CSV; generates M×K standard-normal draws with std::mt19937.
+      2. Host transfers alphas and rands to device (and transposed versions for kernels 2/3).
+      3. Each GPU thread is assigned one observation i (row).
+      4. The thread loops m = 0..M-1: forms K utilities w[k] = alpha[i,k] + rand[m,k] in a local register array w[21].
+      5. Performs a linear scan over k to find argmax of w.
+      6. Increments the per-row counter probs[i, argmax] by 1.
+      7. After M iterations, divides each of K counters by M to get probabilities.
+      8. Three kernel variants: (1) row-major naive, (2) transposed for coalesced loads, (3) transposed + shared-memory staging of w[] and probs[].
+      9. Host verifies against a serial CPU reference and reports timing.
+    </Algorithm_Steps>
+    <Reference_Complexity>
+      Time: O(n · M · K) arithmetic operations ≈ 26,280 · 10,000 · 21 ≈ 5.52 × 10^9 inner-loop ops.
+      Space: O(n·K + M·K) — alphas + probs (n·K doubles each) and rands (M·K doubles); per-thread local w[K] in registers; for kernel 3 an additional 2·K·blockDim shared-memory tile.
+    </Reference_Complexity>
+  </Problem_Classification>
+  <Bottleneck_Analysis>
+    <Classification>Compute-bound (FP64-throughput limited on GA102); secondarily latency/occupancy-limited for the shared-memory variant.</Classification>
+    <Arithmetic_Intensity>
+      Per row i: ~M·(2K) ≈ 10,000·42 ≈ 4.2×10^5 FP64 ops (K adds + K-1 compares + 1 increment per MC draw).
+      Unique bytes touched per row (cache-resident view): K alphas (168 B) + M·K rands (1.68 MB, shared across all rows) + K probs writes (168 B).
+      Total problem FLOPs: n·M·2K ≈ 1.1 × 10^10.
+      Total unique device-memory footprint: alphas (4.21 MB) + rands (1.60 MB) + probs (4.21 MB) ≈ 10 MB, entirely L2-resident on the 6 MB L2 after warm-up of rands/probs.
+      AI (assuming rands stays L2-resident across the n-thread grid): ≈ 1.1×10^10 / 1.0×10^7 ≈ 1.1 × 10^3 FLOP/Byte.
+      AI (cold/no-reuse pessimistic view, counting every rand re-fetch through DRAM): ≈ 1.1×10^10 / (n·M·K·8 B) ≈ 1.1×10^10 / 4.4×10^10 ≈ 0.25 FLOP/Byte.
+    </Arithmetic_Intensity>
+    <Ridge_Point_Comparison>
+      RTX A6000 FP64 peak ≈ 84 SMs · 2 FP64 ops/cycle · 2 (FMA) · 1.8 GHz ≈ 0.6 TFLOPS FP64; peak DRAM BW ≈ 768 GB/s. Ridge point ≈ 0.6×10^12 / 7.68×10^11 ≈ 0.78 FP64-FLOP/Byte.
+      Realistic AI (≈1.1×10^3) is well ABOVE the ridge point ⇒ workload sits in the compute-bound regime once rands is L2-resident.
+    </Ridge_Point_Comparison>
+    <Dominant_Limiter>FP64 ALU throughput on consumer-class Ampere (GA102 has only 2 FP64 cores per SM, i.e. 1/64 of FP32). Secondary limiters: warp divergence in the argmax linear scan, and (for kernel 3) bank conflicts / occupancy drop from a 32 KB shared-memory footprint per 96-thread block.</Dominant_Limiter>
+  </Bottleneck_Analysis>
+  <Memory_Access_Profile>
+    <Pattern>
+      Kernel 1 (compute_probs): row-major layout alphas[i·K+k], probs[i·K+k] — strided-by-K across the warp ⇒ uncoalesced 32-way gathers.
+      Kernels 2 & 3 (unitStrides): transposed layout alphas[k·n+i], probs[k·n+i] — unit stride across threads in the warp ⇒ fully coalesced streaming.
+      rands access: kernel 1 reads rands[m·K+k] (broadcast across warp, same m and k per cycle ⇒ already broadcastable); kernels 2/3 read rands[k·M+m] (also broadcast across the warp). Overall: streaming + broadcast, with the entire rands buffer (1.6 MB) hot in L2 / read-only cache.
+    </Pattern>
+    <Read_Write_Ratio>
+      Per row: M·K + K reads (≈ 2.10×10^5 doubles) vs. M increments + K finalization writes (≈ 1.00×10^4 doubles to global in kernels 1/2; only K=21 global writes in kernel 3 because the M increments hit shared memory).
+      Effective ratio: ≈ 21:1 (kernels 1/2) and ≈ 10,000:1 (kernel 3, global only). Algorithm-level read:write ≈ 21:1.
+    </Read_Write_Ratio>
+    <Reuse_Factor>
+      alphas[i,k]: read M = 10,000 times by the owning thread (kept in register w[k] inside one MC step but re-loaded each m in this code).
+      rands[m,k]: read n = 26,280 times across the grid (huge reuse — fits in L2 / read-only cache, ideal for __constant__ or texture caching if it were smaller).
+      probs[i,k]: updated M times in kernels 1/2 (global RMW), reduced to K writes in kernel 3 via shared memory.
+    </Reuse_Factor>
+    <Coalescing_Feasibility>
+      Kernel 1: poor — requires transformation. Kernels 2/3: natural coalescing achieved by host-side transpose of alphas (n×K → K×n) and rands (M×K → K×M).
+    </Coalescing_Feasibility>
+    <Optimal_Tiling_Hint>
+      (a) Transpose layouts to K-major so threads in a warp index along n (already done in kernels 2/3).
+      (b) Stage rands in shared memory or rely on the read-only / L2 cache — rands is only 1.60 MB and is reused n times.
+      (c) Stage per-thread w[] and the K probability counters in shared memory to remove repeated global RMWs (kernel 3 pattern). Size: 2·K·blockDim·8 B; for blockDim=96, K=21 ⇒ 32,256 B/block — fits in 100 KB/SM but caps occupancy to ≈3 blocks/SM = 288 threads/SM.
+      (d) Better: keep w[] in registers (it already is via the local array w[21]) and only stage the K-entry probability counter in shared memory (or even registers as 21 scalars), dropping shared-mem usage to ~21·blockDim·8 B = 16 KB at blockDim=96, allowing higher occupancy.
+      (e) For very high-K work, tile the K dimension so the per-thread argmax scan stays in registers and uses warp shuffles.
+    </Optimal_Tiling_Hint>
+  </Memory_Access_Profile>
+  <Parallelism_Structure>
+    <Granularity>One thread per observation i (one row of the n×K probability matrix). Each thread performs M·(K adds + K-1 compares + 1 write) ≈ 4.2×10^5 ops independently.</Granularity>
+    <Independence>Fully independent across rows — no inter-thread data dependency. Within a thread the M Monte Carlo iterations are also independent (could be parallelised further across threads if desired).</Independence>
+    <Synchronization>None. No __syncthreads(), no atomics, no warp primitives. Kernel 3 uses shared memory only as per-thread private scratch (each thread owns column threadIdx.x of the shared tile) so no sync is required there either.</Synchronization>
+    <Recommended_Block_Size>
+      For kernels 1/2 (register-only, no shared memory): on cc 8.6 with 1536 threads/SM and 65,536 regs/SM, 128–256 threads/block hits full 1536-thread occupancy. The code's choice of 192 yields exactly 8 blocks = 1536 threads/SM and is near-optimal.
+      For kernel 3 (32 KB shared/block at blockDim=96): occupancy is shared-memory-limited to ~3 blocks/SM = 288 threads/SM, so 96 is a deliberate trade-off; reducing the shared footprint (e.g. dropping the shared w[] and using registers) would allow 128–256 threads/block with full occupancy.
+    </Recommended_Block_Size>
+  </Parallelism_Structure>
+  <Hardware_Constraints>
+    <Architecture>NVIDIA Ampere (GA102)</Architecture>
+    <Compute_Capability>8.6</Compute_Capability>
+    <SM_Count>84</SM_Count>
+    <Max_Threads_Per_SM>1536</Max_Threads_Per_SM>
+    <Max_Threads_Per_Block>1024</Max_Threads_Per_Block>
+    <Warp_Size>32</Warp_Size>
+    <Shared_Memory_Per_Block>99 KB (101,376 B) opt-in dynamic; 48 KB default</Shared_Memory_Per_Block>
+    <Shared_Memory_Per_SM>100 KB (102,400 B)</Shared_Memory_Per_SM>
+    <Registers_Per_Block>65,536</Registers_Per_Block>
+    <Registers_Per_SM>65,536</Registers_Per_SM>
+    <L2_Cache_Size>6 MB (6,291,456 B)</L2_Cache_Size>
+    <Constant_Memory>65,536 B (64 KB)</Constant_Memory>
+    <Memory_Bus_Width>384 bits</Memory_Bus_Width>
+    <Peak_Memory_Bandwidth>≈ 768 GB/s (384-bit GDDR6 @ 16 Gbps effective)</Peak_Memory_Bandwidth>
+    <GPU_Clock_Rate>Max SM clock 2100 MHz (typical sustained boost ≈ 1800 MHz); max memory clock 8001 MHz</GPU_Clock_Rate>
+  </Hardware_Constraints>
+  <Data_Shape>
+    <Input_Dimensions>n = 26,280 observations; K = 21 alternatives; M = 10,000 Monte Carlo draws. alphas: 26,280 × 21. rands: 10,000 × 21. probs: 26,280 × 21.</Input_Dimensions>
+    <Data_Type>float64 (double, IEEE-754 binary64) throughout — kernels declare double w[21]; division by M_d is FP64.</Data_Type>
+    <Total_Memory_Footprint>
+      Device: alphas 4,415,040 B + rands 1,680,000 B + probs 4,415,040 B ≈ 10,510,080 B ≈ 10.03 MB.
+      Host: same three buffers + probs_ref (4.21 MB) + transposed t_alphas (4.21 MB) + t_rands (1.60 MB) ≈ 20.05 MB.
+      Per-thread local: w[21] = 168 B in registers (21 doubles).
+      Kernel 3 shared memory per block: 2 · K · blockDim · 8 B = 2 · 21 · 96 · 8 = 32,256 B.
+    </Total_Memory_Footprint>
+  </Data_Shape>
+</Context_Normalization>

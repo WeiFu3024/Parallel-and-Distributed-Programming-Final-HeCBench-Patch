@@ -1,0 +1,112 @@
+<Context_Normalization>
+  <Problem_Classification>
+    <Domain>Computational Finance / Quantitative Derivatives Pricing</Domain>
+    <Algorithm>Cox-Ross-Rubinstein (CRR) Binomial Tree for European Call Options</Algorithm>
+    <Algorithm_Purpose>Compute the fair value of European call options by discretizing the underlying asset's price evolution into a recombining binomial lattice and discounting expected payoffs backward to t=0. Black-Scholes (analytic) and a CPU binomial reference are used for validation.</Algorithm_Purpose>
+    <Algorithm_Steps>
+      1. Host precomputes per-option lattice parameters: dt = T/NUM_STEPS, vDt = V*sqrt(dt), discount factor Df = exp(-R*dt), risk-neutral probabilities pu/pd, and their discounted forms puByDf, pdByDf. These are packed into __TOptionData.
+      2. cudaMemcpy of MAX_OPTIONS option records to device.
+      3. Launch binomialOptionsKernel with grid = optN (one block per option), block = 128 threads.
+         a. Each thread loads its option's S, X, vDt, puByDf, pdByDf (broadcast load — all 128 threads in the block read the same option struct).
+         b. Each thread computes ELEMS_PER_THREAD = NUM_STEPS/128 expiry payoffs max(S*exp(vDt*(2i-N)) - X, 0) into a register-resident array call[].
+         c. Backward induction: for i from NUM_STEPS down to 1, each thread (1) writes its leftmost value call[0] into shared call_exchange[tid], (2) __syncthreads, (3) reads its right neighbor call_exchange[tid+1] into call[ELEMS_PER_THREAD], (4) __syncthreads, (5) if i > final_it (its active tree-front), executes ELEMS_PER_THREAD FMAs: call[j] = puByDf*call[j+1] + pdByDf*call[j].
+         d. Thread 0 of each block writes call[0] (root value) to d_CallValue[blockIdx.x].
+      4. cudaMemcpy results back; host compares against Black-Scholes analytic values and a CPU binomial reference.
+    </Algorithm_Steps>
+    <Reference_Complexity>
+      Time: O(OPT_N * NUM_STEPS^2 / P) where P is the parallel width per option; with P=128 threads doing ELEMS_PER_THREAD work each, the wall-clock per option is O(NUM_STEPS * ELEMS_PER_THREAD) = O(NUM_STEPS^2 / 128). The serial dependency across time steps prevents reduction of the outer NUM_STEPS factor.
+      Space: O(OPT_N) global memory for I/O; O(THREADBLOCK_SIZE+1) shared memory per block; O(ELEMS_PER_THREAD) registers per thread for the call[] array.
+    </Reference_Complexity>
+  </Problem_Classification>
+
+  <Bottleneck_Analysis>
+    <Classification>Latency-bound (synchronization-dominated), with a secondary compute component. Definitely NOT memory-bound.</Classification>
+    <Arithmetic_Intensity>
+      Assuming standard sample defaults NUM_STEPS=2048, MAX_OPTIONS=1024, single precision (real=float):
+      - Global memory traffic per option: 20 B read (struct) + 4 B written = 24 B.
+      - FLOPs per option: initialization ~16 elems × 128 threads × ~5 FLOPs (exp counted as ~1 op for SFU) ≈ 1.0e4; backward induction = NUM_STEPS × ELEMS_PER_THREAD × 128 × 2 FLOPs = 2048 × 16 × 128 × 2 ≈ 8.4e6 FLOPs.
+      - AI over global memory ≈ 8.4e6 / 24 ≈ 3.5 × 10^5 FLOP/Byte — extraordinarily high.
+      - Even accounting for shared-memory traffic (~4 B × 2 ld + 2 st × 2048 iters × 128 threads ≈ 4 MB shmem per block; AI ≈ 2 FLOP/B), the kernel is still well above any bandwidth ridge.
+    </Arithmetic_Intensity>
+    <Ridge_Point_Comparison>
+      RTX A6000 ridge: peak FP32 ≈ 38.7 TFLOP/s ÷ peak HBM/GDDR BW ≈ 768 GB/s ⇒ ~50 FLOP/Byte. Observed AI (~3.5e5) is roughly 7000× above the ridge — well into the compute/latency-bound regime.
+    </Ridge_Point_Comparison>
+    <Dominant_Limiter>
+      Two coupled limiters, in order of estimated impact:
+      1. __syncthreads barrier latency × tree-step serialization. The backward induction performs 2 × NUM_STEPS = 4096 block-wide barriers per option, each with a hard RAW dependency on the previous step (call[j] depends on call[j+1] from iteration i-1). This serializes the dominant work and yields very low MLP/ILP between syncs.
+      2. SM occupancy / under-utilization. Each block uses one option = 128 threads. On a GA102 SM with 1536 thread capacity, you need ≥12 resident blocks per SM to saturate threads, but with OPT_N=1024 and 84 SMs there are only ~12 blocks per SM total — borderline. Register pressure from call[ELEMS_PER_THREAD+1] (17 reals) and the heavy live-state may further cap blocks/SM, leaving SMs idle while threads block on syncthreads.
+      Global memory bandwidth and FP32 throughput are essentially non-issues here.
+    </Dominant_Limiter>
+  </Bottleneck_Analysis>
+
+  <Memory_Access_Profile>
+    <Pattern>
+      Global memory: degenerate broadcast — all 128 threads in a block read the same __TOptionData[blockIdx.x] struct, so the load collapses to a single coalesced (and cached) transaction per field per block. One scalar coalesced store per block at the end.
+      Shared memory: sliding-window / nearest-neighbor exchange. Each thread writes call_exchange[tid] and reads call_exchange[tid+1]. Stride-1 across threads — no bank conflicts on a 32-bank SM (each thread hits a distinct bank within a warp).
+    </Pattern>
+    <Read_Write_Ratio>
+      Global: 5 reals read : 1 real written ≈ 5:1 (per option, per kernel invocation).
+      Shared: 2 reads : 2 writes per thread per time step (1:1).
+    </Read_Write_Ratio>
+    <Reuse_Factor>
+      Each option's 5 scalar parameters (S, X, vDt, puByDf, pdByDf) are reused ~NUM_STEPS × ELEMS_PER_THREAD ≈ 32,000 times after the initial load (held in registers). Each shared-memory slot is written and read exactly once per time step, so shared reuse ≈ 1 per step but NUM_STEPS steps total ⇒ effectively reused 2048× across the kernel lifetime.
+    </Reuse_Factor>
+    <Coalescing_Feasibility>Natural and already achieved. Both the struct load and the final store are coalesced; shared exchange is bank-conflict-free.</Coalescing_Feasibility>
+    <Optimal_Tiling_Hint>
+      The current "1 block per option, 128 threads, 16 elements/thread" is close to optimal for this code shape; the structural improvement is not tiling but rather (a) shrinking the per-step sync cost — e.g., use warp-shuffle (__shfl_up_sync) within a 32-thread warp instead of shared memory + __syncthreads, reducing barriers from 2 per step to 0 within a warp and only 1 cross-warp sync, and (b) increasing concurrent options per SM by packing several options into one block (e.g., 4 options × 32-thread warps) to better fill the 1536-thread/SM budget. Shared memory needed remains tiny: 4 × (THREADBLOCK_SIZE+1) ≈ 516 B per block (FP32) — well under the 48 KB default cap.
+    </Optimal_Tiling_Hint>
+  </Memory_Access_Profile>
+
+  <Parallelism_Structure>
+    <Granularity>
+      Coarse: one option per CUDA block.
+      Fine: one tree-front segment of ELEMS_PER_THREAD (=16) lattice nodes per thread, advanced one time step per outer loop iteration.
+    </Granularity>
+    <Independence>
+      Across blocks (options): fully independent — embarrassingly parallel.
+      Within a block (across time steps): hard RAW dependency — step i requires step i+1's values from the neighbor thread.
+      Within a thread (across the 16 elements at one step): independent FMAs, hence the #pragma unroll.
+    </Independence>
+    <Synchronization>
+      __syncthreads() — exactly two per backward-induction step (one after writing call_exchange, one after reading the neighbor), totaling 2 × NUM_STEPS ≈ 4096 barriers per option. No atomics, no global synchronization. Function-level cudaDeviceSynchronize bracketing the timing loop on the host.
+    </Synchronization>
+    <Recommended_Block_Size>
+      The code hard-codes THREADBLOCK_SIZE=128 with a compile-time assert that NUM_STEPS is divisible by it. On GA102 (CC 8.6, 1536 threads/SM), 128 threads gives a theoretical max of 12 resident blocks/SM — exactly matching the 16-block/SM hardware ceiling minus register pressure. 128 is a defensible choice; alternatives worth exploring statically: 256 threads × ELEMS_PER_THREAD=8 (fewer barriers but lower per-thread ILP), or 64 threads × ELEMS_PER_THREAD=32 (more ILP, doubled resident blocks possible but doubled barrier count avoided per step). For this hardware, 128 remains a reasonable theoretical optimum given the unroll factor and shared-memory exchange pattern.
+    </Recommended_Block_Size>
+  </Parallelism_Structure>
+
+  <Hardware_Constraints>
+    <Architecture>NVIDIA Ampere (GA102)</Architecture>
+    <Compute_Capability>8.6</Compute_Capability>
+    <SM_Count>84 (GA102 full-die config used in RTX A6000)</SM_Count>
+    <Max_Threads_Per_SM>1536</Max_Threads_Per_SM>
+    <Max_Threads_Per_Block>1024</Max_Threads_Per_Block>
+    <Warp_Size>32</Warp_Size>
+    <Shared_Memory_Per_Block>49152 bytes default (48 KB); opt-in up to 100 KB via cudaFuncSetAttribute on CC 8.6</Shared_Memory_Per_Block>
+    <Shared_Memory_Per_SM>102400 bytes (100 KB; unified 128 KB L1/shared partition with 28 KB reserved for L1)</Shared_Memory_Per_SM>
+    <Registers_Per_Block>65536</Registers_Per_Block>
+    <Registers_Per_SM>65536</Registers_Per_SM>
+    <L2_Cache_Size>6291456 bytes (6 MB)</L2_Cache_Size>
+    <Constant_Memory>65536 bytes (64 KB)</Constant_Memory>
+    <Memory_Bus_Width>384 bits</Memory_Bus_Width>
+    <Peak_Memory_Bandwidth>~768 GB/s (384-bit @ 8001 MHz GDDR6 ECC; effective: 2 × 8001 MHz × 48 B/cycle ≈ 768 GB/s)</Peak_Memory_Bandwidth>
+    <GPU_Clock_Rate>2100 MHz (max boost as reported by nvidia-smi; base ~1410 MHz)</GPU_Clock_Rate>
+  </Hardware_Constraints>
+
+  <Data_Shape>
+    <Input_Dimensions>
+      OPT_N = MAX_OPTIONS options (defined in binomialOptions.h, not visible in this TU; standard NVIDIA sample value is 1024). Each option has 5 scalar inputs {S, X, T, R, V}. Tree depth NUM_STEPS (defined in binomialOptions.h; standard sample value is 2048, consistent with ELEMS_PER_THREAD=16 when THREADBLOCK_SIZE=128).
+    </Input_Dimensions>
+    <Data_Type>
+      float32 (real = float, single precision) by default. Code path under #ifdef DOUBLE_PRECISION switches to double (float64); since DOUBLE_PRECISION is not defined in this TU's visible compile flags, single precision is the static-analysis baseline.
+    </Data_Type>
+    <Total_Memory_Footprint>
+      Assuming MAX_OPTIONS=1024, NUM_STEPS=2048, FP32:
+      - Device: d_OptionData (20 B × 1024) + d_CallValue (4 B × 1024) = 24,576 B ≈ 24 KB.
+      - Host: optionData (5 × 4 B × 1024 = 20 KB) + 3 × callValue arrays (4 B × 1024 × 3 = 12 KB) + CPU reference static Call[NUM_STEPS+1] (~8 KB) ≈ 40 KB.
+      - Per-block shared memory: 4 B × (128+1) = 516 B.
+      - Per-thread registers: 17 reals × 4 B = 68 B of named live state in call[], plus loop scalars and option parameters; estimated ~28–40 registers/thread (compile-only confirms).
+      Total device memory footprint is utterly negligible (well under 1 MB), confirming this workload places zero pressure on the 48 GB VRAM and only nominal pressure on the 6 MB L2.
+    </Total_Memory_Footprint>
+  </Data_Shape>
+</Context_Normalization>

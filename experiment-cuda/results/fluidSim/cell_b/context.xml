@@ -1,0 +1,87 @@
+<Context_Normalization>
+  <Problem_Classification>
+    <Domain>Computational Fluid Dynamics (CFD) / Mesoscopic flow simulation</Domain>
+    <Algorithm>D2Q9 Lattice Boltzmann Method (LBM) with BGK (single-relaxation-time) collision and bounce-back boundaries</Algorithm>
+    <Algorithm_Purpose>Simulates incompressible fluid flow on a 2D Cartesian lattice by evolving 9 discrete particle distribution functions per cell (1 rest + 4 axial + 4 diagonal). Each iteration produces an updated density rho and velocity u from the distributions, advancing toward the Navier–Stokes solution in the macroscopic limit.</Algorithm_Purpose>
+    <Algorithm_Steps>
+      1. Buffer setup (host→device): copy initial distributions (if0, if1234, if5678), boundary mask (type), direction tables (dirX, dirY), and weights (w[9]) to device; duplicate into output buffers.
+      2. Time-step loop (host-side, `iterations` times):
+         a. Launch `lbm` kernel with one thread per lattice cell.
+         b. Per-thread inside kernel:
+            i.   Load this cell's 9 distributions (1 scalar + 2 double4) and its type flag.
+            ii.  Collide:
+                 - If boundary: bounce-back — swap opposite directions (1↔3, 2↔4, 5↔7, 6↔8).
+                 - If fluid: compute rho = Σf_i; compute u = (Σf_i·e_i)/rho for x,y; compute 9 equilibrium values f_eq via `ced` (1 + 3·eu + 4.5·eu² − 1.5·u²); blend f ← (1−ω)f + ω·f_eq.
+            iii. Propagate (stream): for non-border cells, scatter each of the 8 non-rest post-collision values to the neighbor cell indicated by (dirX_i, dirY_i); write the rest population to the cell itself.
+         c. Swap d_if{*} and d_of{*} pointers (double-buffering).
+      3. Copy final distributions device→host.
+    </Algorithm_Steps>
+    <Reference_Complexity>
+      Time: O(iterations × Nx × Ny) — constant work per cell per step
+      Space: O(Nx × Ny) — two double-buffered copies of 9 distributions + 1 boundary mask
+    </Reference_Complexity>
+  </Problem_Classification>
+
+  <Bottleneck_Analysis>
+    <Classification>Memory-bound (with significant scatter-write penalty); borderline mixed against FP64 throughput.</Classification>
+    <Arithmetic_Intensity>
+      Per fluid cell, minimum traffic = 9 doubles read (72 B) + 1 bool read (1 B) + 9 doubles written (72 B) ≈ 145 B (cache effects from neighbor reuse during scatter aside).
+      FLOPs per fluid cell (approx., counting +,−,×,÷ each as 1):
+        - rho reduction: 8 adds
+        - u.x, u.y dot-products: 2 × (8 mul + 7 add) = 30, + 2 divisions ≈ 32
+        - 9 × ced: each ≈ 3 (u²) + 3 (eu) + 7 (polynomial) + 2 (rho·w·) ≈ 15 → 135
+        - BGK blend on 9 components: 9 × 3 ≈ 27
+        - Total ≈ 200–220 FLOP (FP64)
+      Intensity ≈ 210 / 145 ≈ 1.45 FLOP/byte (FP64).
+    </Arithmetic_Intensity>
+    <Ridge_Point_Comparison>
+      RTX A6000 (GA102): FP64 peak ≈ 604 GFLOPS (FP64:FP32 = 1:64), bandwidth ≈ 768 GB/s ⇒ FP64 ridge ≈ 0.79 FLOP/byte. Intensity 1.45 sits ABOVE the FP64 ridge, suggesting nominally FP64-compute-bound. However, the propagation phase performs 8 scattered writes per thread to non-contiguous neighbor cells, halving (or worse) effective achievable bandwidth, which pulls the effective ridge upward and shifts the kernel back into memory-bound territory in practice.
+    </Ridge_Point_Comparison>
+    <Dominant_Limiter>DRAM/L2 traffic from uncoalesced scatter writes in the streaming step, compounded by warp divergence between fluid/boundary cells and by the FP64 division in u = Σ/rho. Secondary: low arithmetic intensity headroom against FP64 throughput on GA102's 1:64 FP64 unit.</Dominant_Limiter>
+  </Bottleneck_Analysis>
+
+  <Memory_Access_Profile>
+    <Pattern>Hybrid: streaming/coalesced reads of inputs at `pos`, but gather–scatter writes during propagation (each thread writes to 8 neighbor positions pos±1, pos±width, pos±width±1). Diagonal writes (s5–s8 → ±width±1) cross row boundaries and break full coalescing.</Pattern>
+    <Read_Write_Ratio>1:1 by volume (9 doubles in, 9 doubles out per cell), plus 1 B boundary flag read.</Read_Write_Ratio>
+    <Reuse_Factor>Within one kernel launch: ~1 (each distribution loaded and stored exactly once per cell per step). Across iterations a value is touched 9 times (once per direction it streams along) but these are separated by a full kernel launch, so on-chip reuse is effectively zero without explicit shared-memory tiling.</Reuse_Factor>
+    <Coalescing_Feasibility>Reads: Natural — `pos = idx + width*idy` with idx running fastest gives coalesced 128-byte transactions for f0, f1234, f5678. Writes: Requires transformation — the scatter on 8 directions to neighbor cells produces partly coalesced (s0/s2 east/west), aligned-row (s1/s3 north/south), and unaligned diagonal (s4–s7) writes; a pull-scheme (read from neighbors, write to self) would convert these to coalesced stores.</Coalescing_Feasibility>
+    <Optimal_Tiling_Hint>Switch to a "pull" streaming scheme so that all stores are to `pos` (coalesced) and only loads gather from neighbors (L1/L2 can absorb). For further speedup, tile (BX, BY) blocks into shared memory with halo (BX+2)·(BY+2): with BX=BY=32, halo tile = 34×34×9 doubles ≈ 73 KB — too large for one block on CC 8.6 (100 KB/SM but only one block fits). Drop to BX=32, BY=8 → 34×10×9 doubles ≈ 24 KB shared mem/block, easily fitting 2–3 concurrent blocks per SM. Alternatively, store only the eight non-rest populations needing neighbor access (~21 KB) and keep f0 in registers.</Optimal_Tiling_Hint>
+  </Memory_Access_Profile>
+
+  <Parallelism_Structure>
+    <Granularity>One CUDA thread per lattice cell. Each thread performs a full collide + 1 self-write + up to 8 scatter writes.</Granularity>
+    <Independence>Fully independent within a single kernel launch (uses double-buffered in/out arrays, no read-after-write across threads in the same step). Inter-iteration RAW dependency is resolved by the host-side pointer swap between launches.</Independence>
+    <Synchronization>None inside the kernel — no __syncthreads(), no atomics, no cooperative groups. Implicit global synchronization is provided by the kernel boundary between time steps.</Synchronization>
+    <Recommended_Block_Size>
+      Current launch uses `grids(256,1)` as gridDim and `blocks(Nx/256, Ny)` as blockDim — this is unconventional and for typical Nx,Ny (e.g. 1024×1024) yields blockDim = (4,1024) = 4096 threads/block, exceeding the CC 8.6 hard limit of 1024 threads/block. Recommend a conventional 2D tiling such as 32×8 (256 threads) or 16×16 (256 threads): launching grid = (ceil(Nx/32), ceil(Ny/8)) gives natural memory coalescing along x and good occupancy. With ~64 regs/thread and modest shared-mem use, 256-thread blocks allow 4–6 concurrent blocks per SM (up to the 1536-thread-per-SM ceiling), which is the sweet spot for FP64-heavy stencil kernels on GA102.
+    </Recommended_Block_Size>
+  </Parallelism_Structure>
+
+  <Hardware_Constraints>
+    <Architecture>NVIDIA Ampere (GA102)</Architecture>
+    <Compute_Capability>8.6</Compute_Capability>
+    <SM_Count>84</SM_Count>
+    <Max_Threads_Per_SM>1536</Max_Threads_Per_SM>
+    <Max_Threads_Per_Block>1024</Max_Threads_Per_Block>
+    <Warp_Size>32</Warp_Size>
+    <Shared_Memory_Per_Block>99 KB (101,376 B) opt-in maximum on CC 8.6; default 48 KB</Shared_Memory_Per_Block>
+    <Shared_Memory_Per_SM>100 KB (102,400 B)</Shared_Memory_Per_SM>
+    <Registers_Per_Block>65,536 (32-bit registers)</Registers_Per_Block>
+    <Registers_Per_SM>65,536 (32-bit registers)</Registers_Per_SM>
+    <L2_Cache_Size>6 MB (6,291,456 B)</L2_Cache_Size>
+    <Constant_Memory>65,536 B (64 KB)</Constant_Memory>
+    <Memory_Bus_Width>384 bits (GDDR6 ECC)</Memory_Bus_Width>
+    <Peak_Memory_Bandwidth>~768 GB/s (8001 MHz × 2 × 384 b / 8)</Peak_Memory_Bandwidth>
+    <GPU_Clock_Rate>2100 MHz (max SM clock reported by nvidia-smi)</GPU_Clock_Rate>
+  </Hardware_Constraints>
+
+  <Data_Shape>
+    <Input_Dimensions>Nx = dims[0], Ny = dims[1] — runtime-supplied; not statically known from this source. Constraints implied by the launch arithmetic: Nx must be a multiple of GROUP_SIZE = 256, and Nx·Ny/256 ≤ 1024 (else blockDim exceeds device limit).</Input_Dimensions>
+    <Data_Type>Distributions: double (FP64). Boundary mask: bool (1 B). Direction tables (dirX/dirY): double8 passed by value. Weights: double[9]. Indices: 32-bit unsigned/int.</Data_Type>
+    <Total_Memory_Footprint>
+      Per cell: 2 × (1 + 4 + 4) doubles for double-buffered distributions + 1 bool = 2·9·8 + 1 = 145 B.
+      Plus tiny constants: d_weight = 72 B; dirX, dirY passed by value through kernel args.
+      Total device memory ≈ 145 · Nx · Ny B (e.g. ≈ 152 MB at 1024×1024, ≈ 608 MB at 2048×2048, ≈ 2.4 GB at 4096×4096), well within the 48 GB VRAM (≈10 GB free at probe time). Host mirror is similarly sized.
+    </Total_Memory_Footprint>
+  </Data_Shape>
+</Context_Normalization>

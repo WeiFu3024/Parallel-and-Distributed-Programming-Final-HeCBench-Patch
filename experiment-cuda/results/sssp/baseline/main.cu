@@ -33,15 +33,81 @@
  *
  */
 
+// System includes
 #include <unistd.h>
 #include <thread>
 #include <assert.h>
+#include <atomic>
+#include <math.h>
+#include <vector>
+#include <algorithm>
 #include <cuda.h>
+
+// Local dep includes (kept as separate dep files)
 #include "kernel.h"
 #include "support/common.h"
 #include "support/timer.h"
 #include "support/verify.h"
 
+// ---- kernel.cu body (inlined; weak to avoid duplicate symbols when
+//      compile.sh also compiles kernel.cu as a separate TU) ----
+
+__attribute__((weak))
+int atomic_maximum(std::atomic_int *maximum_value, int value) {
+    int prev_value = (maximum_value)->load();
+    while(prev_value < value && !(maximum_value)->compare_exchange_strong(prev_value, value))
+        ;
+    return prev_value;
+}
+
+__attribute__((weak))
+void run_cpu_threads(Node *h_graph_nodes, Edge *h_graph_edges, std::atomic_int *cost, std::atomic_int *color,
+    int *q1, int *q2, int *n_t, std::atomic_int *head, std::atomic_int *tail,
+    std::atomic_int *threads_end, std::atomic_int *threads_run, std::atomic_int *gray_shade,
+    std::atomic_int *iter, int n_threads, int LIMIT, const int GPU) {
+///////////////// Run CPU worker threads /////////////////////////////////
+#if PRINT
+    printf("Starting %d CPU threads\n", n_threads * CPU);
+#endif
+    std::vector<std::thread> cpu_threads;
+    for(int k = 0; k < n_threads; k++) {
+        cpu_threads.push_back(std::thread([=]() {
+
+            int iter_local = (iter)->load(); // Current iteration/level
+
+            int gray_shade_local = (gray_shade)->load();
+            int base       = (head)->fetch_add(1); // Fetch new node from input queue
+            while(base < *n_t) {
+                int pid = q1[base];
+                color[pid].store(BLACK); // Node visited
+                int cur_cost = cost[pid].load();
+                //For each outgoing edge
+                for(int i = h_graph_nodes[pid].x; i < (h_graph_nodes[pid].y + h_graph_nodes[pid].x); i++) {
+                    int id   = h_graph_edges[i].x;
+                    int cost_local = h_graph_edges[i].y;
+                    cost_local += cur_cost;
+                    int orig_cost = atomic_maximum(&cost[id], cost_local);
+                    if(orig_cost < cost_local) {
+                        int old_color = atomic_maximum(&color[id], gray_shade_local);
+                        if(old_color != gray_shade_local) {
+                            //push to the queue
+                            int index_o     = (tail)->fetch_add(1);
+                            q2[index_o] = id;
+                        }
+                    }
+                }
+                base = (head)->fetch_add(1); // Fetch new node from input queue
+            }
+
+            if(k == 0) {
+                (iter)->fetch_add(1);
+            }
+        }));
+    }
+    std::for_each(cpu_threads.begin(), cpu_threads.end(), [](std::thread &t) { t.join(); });
+}
+
+// ---- main.cu body ----
 
 // Params
 struct Params {
@@ -121,7 +187,7 @@ int read_input_size(int &n_nodes, int &n_edges, const Params &p) {
     printf("Error: failed to read file %s. Exit\n", p.file_name);
     return -1;
   }
-    
+
   fscanf(fp, "%d", &n_nodes);
   fscanf(fp, "%d", &n_edges);
   if(fp) fclose(fp);
@@ -522,7 +588,7 @@ int main(int argc, char **argv) {
           if(rep >= p.n_warmup)
             timer.stop("Copy To Device");
 
-          assert(p.n_gpu_threads <= max_gpu_threads && 
+          assert(p.n_gpu_threads <= max_gpu_threads &&
               "The thread block size is greater than the maximum thread block size that can be used on this device");
 
           dim3 dimGrid(p.n_gpu_blocks);

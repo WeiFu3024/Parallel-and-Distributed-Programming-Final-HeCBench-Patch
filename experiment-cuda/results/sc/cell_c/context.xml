@@ -1,0 +1,85 @@
+<Context_Normalization>
+  <Problem_Classification>
+    <Domain>Parallel data filtering / GPU primitives (Chai benchmark suite — Stream Compaction, collaborative CPU+GPU)</Domain>
+    <Algorithm>Stream Compaction via chained-scan (decoupled lookback) prefix sum</Algorithm>
+    <Algorithm_Purpose>Given an input array and a sentinel "remove_value", produce a densely-packed output array containing only the elements that do not equal the sentinel, preserving original order. Output length = (in_size × compaction_factor)/100.</Algorithm_Purpose>
+    <Algorithm_Steps>
+      1. Input is logically partitioned into n_tasks tiles, each of REGS × blockDim.x elements; tiles are assigned to CPU/GPU via Partitioner (static cut at alpha, or dynamic worklist with atomic counter when DYNAMIC_PARTITION is enabled).
+      2. Per tile, each thread loads REGS elements into thread-local registers (reg[REGS]) with stride blockDim.x to achieve coalesced reads. While loading, each thread accumulates local_cnt = number of valid (≠ value) elements it holds.
+      3. Block-level tree reduction in shared memory (reduce()) produces l_count[0] = number of valid elements in the whole tile.
+      4. Chained-scan / lookback synchronization: thread 0 spin-waits on flags[my_s] (atomicAdd with 0 to perform an atomic load), reads predecessor's cumulative count p_count, then atomically publishes (p_count + l_count[0]) into flags[my_s+1]. l_count[0] is rewritten to (p_count − 1) to serve as the per-tile output base offset.
+      5. Block-wide exclusive binary prefix-sum (block_binary_prefix_sums, an in-place Blelloch up-/down-sweep on shared memory) computes the per-element scatter address for each valid register.
+      6. Each thread scatters its valid registers to output[pos]; invalid (== value) entries are dropped.
+      7. CPU worker threads execute the analogous logic (no shared memory; using std::atomic flags) on their share of tiles. Final result is one densely packed array in (managed or host) memory.
+    </Algorithm_Steps>
+    <Reference_Complexity>
+      Time: O(N) work, O(N / (P · REGS) + log(blockDim.x)) span per tile (reduction + scan are O(log B)), plus a serial O(n_tasks) critical chain through the flag handshakes.
+      Space: O(N) for input/output (in-place reuse: d_in_out == output and input) + O(n_tasks) for flags + O(blockDim.x) shared memory per block.
+    </Reference_Complexity>
+  </Problem_Classification>
+  <Bottleneck_Analysis>
+    <Classification>Memory-bound, with a secondary latency component from the serialized chained-scan flag handshake (each block must observe its predecessor's atomic publish before it can scatter).</Classification>
+    <Arithmetic_Intensity>
+      Per input element the kernel performs roughly: 1 global load (4 B for int T), ~1 compare, ~0.5 global store on average (compaction_factor = 50% → ~half the inputs are written), plus O(log B) shared-memory ops amortized over REGS elements (negligible global traffic). Useful FLOPs are essentially zero (integer compares only); even counting the compare as 1 op gives:
+      AI ≈ 1 op / (4 B read + 2 B written avg) ≈ 0.17 op/byte.
+      If FP32 FLOPs are required strictly, AI ≈ 0 FLOP/byte.
+    </Arithmetic_Intensity>
+    <Ridge_Point_Comparison>
+      RTX A6000 ridge point ≈ Peak FP32 (~38.7 TFLOPS) / Peak BW (~768 GB/s) ≈ 50 FLOP/byte. The kernel's AI (~0.17) is roughly two-and-a-half orders of magnitude below the ridge — deeply in the bandwidth-bound regime.
+    </Ridge_Point_Comparison>
+    <Dominant_Limiter>
+      DRAM bandwidth for the streaming load/store of the input/output arrays. A secondary and non-negligible limiter is the serial dependence chain through flags[]: each tile's scatter cannot start until the predecessor publishes its prefix, so when n_tasks is large relative to the number of resident blocks, the spin-wait inserts latency that bandwidth utilization cannot mask. Atomic contention on flags[] and on the worklist counter (in DYNAMIC_PARTITION mode) is a tertiary contributor.
+    </Dominant_Limiter>
+  </Bottleneck_Analysis>
+  <Memory_Access_Profile>
+    <Pattern>Streaming coalesced reads (within each unrolled j: thread t reads pos = base + t, then base += blockDim.x — 128-byte aligned warp accesses). Scatter / compacted writes for the output (mostly sequential into per-tile slots, but with intra-warp gaps where elements are filtered → partially coalesced). Flags array exhibits a sparse atomic read/write pattern (one location per tile, serialized chain).</Pattern>
+    <Read_Write_Ratio>Read:Write ≈ 1 : 0.5 in bytes (every element read; only non-sentinel elements — compaction_factor% by default = 50% — are written). With c=50 default: ~2:1.</Read_Write_Ratio>
+    <Reuse_Factor>1 (each input element is loaded exactly once into a register and never re-read from global memory). Shared memory holds only reduction/scan scratch, not input data — so global-memory reuse factor = 1.</Reuse_Factor>
+    <Coalescing_Feasibility>Natural for the read path (stride-1 across threadIdx.x). Writes are naturally coalesced within a tile up to the gaps introduced by filtering; no transformation needed. Flag accesses are inherently scalar/serial and not coalescable, but they are O(n_tasks) and thus negligible in volume.</Coalescing_Feasibility>
+    <Optimal_Tiling_Hint>
+      Tile size already chosen: REGS × blockDim.x elements per block (with default blockDim.x = 256, this is 256·REGS ints per tile). Shared memory needed = blockDim.x · sizeof(int) (for l_data scan/reduce buffer) + 1·sizeof(int) (l_count) + 1·sizeof(int) (l_tmp under DYNAMIC_PARTITION) ≈ 1028–1032 B per block — trivial vs. the A6000's 100 KB/SM limit. With 1024 KB of registers/SM and ~256 threads/block, the kernel can comfortably run many blocks per SM; the natural tuning lever is REGS (raise to 8–16 to amortize the per-tile chained-scan handshake over more elements), not shared memory.
+    </Optimal_Tiling_Hint>
+  </Memory_Access_Profile>
+  <Parallelism_Structure>
+    <Granularity>One thread processes REGS elements (register-tiled). One block processes one tile = REGS · blockDim.x elements. Across the grid, gridDim.x = p.n_gpu_blocks tiles are in flight concurrently; remaining tiles are picked up either by grid-stride iteration (static) or by atomic worklist (dynamic).</Granularity>
+    <Independence>Within a tile: fully independent reads + a tree-reduction + a tree-prefix-sum (parallel-reduction dependencies only). Across tiles: Has RAW dependency on the cumulative count chain in flags[] — tile k cannot determine its output base until tile k-1 publishes. This is the classic chained-scan dependency.</Independence>
+    <Synchronization>
+      Intra-block: __syncthreads() barriers inside reduce() and block_binary_prefix_sums().
+      Inter-block (GPU): atomicAdd / atomicAdd_system spin-loop on flags[] (lookback handshake) — busy-wait, serializing tile commits.
+      Host-device (DYNAMIC_PARTITION): atomicAdd_system on a unified-memory worklist counter and on flags[] (system-scope atomics so CPU std::atomic_int and GPU agree).
+      Host-host: std::atomic loads / fetch_add on the same flags[] array used by the CPU worker threads; std::thread::join() at the very end.
+    </Synchronization>
+    <Recommended_Block_Size>
+      256 threads/block (matches the source default and is near-optimal for A6000): yields 1536/256 = 6 blocks/SM theoretical occupancy, well under the 16-block/SM and 1536-thread/SM limits of CC 8.6. Larger blocks (512) would halve the active-block count and make the chained-scan chain longer per SM; smaller blocks (128) would increase the chain length even more. 256 is the sweet spot. The launch should also size gridDim.x close to 84·6 = 504 blocks (or up to n_tasks) to fully populate the SMs while keeping enough blocks resident to hide the lookback latency.
+    </Recommended_Block_Size>
+  </Parallelism_Structure>
+  <Hardware_Constraints>
+    <Architecture>NVIDIA Ampere (GA102)</Architecture>
+    <Compute_Capability>8.6</Compute_Capability>
+    <SM_Count>84</SM_Count>
+    <Max_Threads_Per_SM>1536</Max_Threads_Per_SM>
+    <Max_Threads_Per_Block>1024</Max_Threads_Per_Block>
+    <Warp_Size>32</Warp_Size>
+    <Shared_Memory_Per_Block>Up to 100 KB opt-in (default carve-out 48 KB); architectural max per block on CC 8.6 = 99 KB</Shared_Memory_Per_Block>
+    <Shared_Memory_Per_SM>100 KB (combined L1/shared = 128 KB per SM; 100 KB usable as shared)</Shared_Memory_Per_SM>
+    <Registers_Per_Block>65536 (32-bit registers)</Registers_Per_Block>
+    <Registers_Per_SM>65536 (32-bit registers)</Registers_Per_SM>
+    <L2_Cache_Size>6 MB (6291456 B)</L2_Cache_Size>
+    <Constant_Memory>64 KB (65536 B)</Constant_Memory>
+    <Memory_Bus_Width>384 bits</Memory_Bus_Width>
+    <Peak_Memory_Bandwidth>~768 GB/s (384-bit GDDR6 @ 8001 MHz × 2 = 16 Gbps effective → 384·16/8 = 768 GB/s)</Peak_Memory_Bandwidth>
+    <GPU_Clock_Rate>2100 MHz (max boost reported by nvidia-smi); base clock substantially lower</GPU_Clock_Rate>
+  </Hardware_Constraints>
+  <Data_Shape>
+    <Input_Dimensions>1-D vector of in_size = 8,388,608 elements (default, -n flag). Logical partitioning: n_tasks = ceil(in_size / (n_gpu_threads · REGS)) tiles; with defaults n_gpu_threads = 256 and assuming REGS = 4 (typical Chai default), n_tasks ≈ 8192. Grid: n_gpu_blocks = 1024 (default). CPU threads: 4 (default). alpha = 0.1 default → ~10% of tiles to CPU.</Input_Dimensions>
+    <Data_Type>T is defined in support/common.h and not visible in this translation unit; based on remove_value being declared int, the initializer casting (T)p.remove_value, the flags array being typed as int, and standard Chai SC conventions, T = int32 (4 bytes). All analyses above assume sizeof(T) = 4.</Data_Type>
+    <Total_Memory_Footprint>
+      • h_in_out (in-place input/output, also used by GPU under DYNAMIC_PARTITION via managed memory): 8,388,608 × 4 B = 32 MB.
+      • Non-DYNAMIC path additionally allocates a device-side d_in_out of n_tasks_gpu · n_gpu_threads · REGS · 4 B ≈ up to 32 MB (whatever fraction is sent to the GPU).
+      • h_in_backup: 32 MB.
+      • h_flags / d_flags: (n_tasks + 1) × sizeof(int or std::atomic_int) ≈ 8193 × 4 B ≈ 32 KB.
+      • worklist (DYNAMIC only): 4 B.
+      Total working set ≈ 64 MB (DYNAMIC, managed) to ~96 MB (static, host + device copies + backup). Comfortably fits in the A6000's 48 GB VRAM and far exceeds the 6 MB L2, so the kernel cannot rely on L2 for reuse — confirming the memory-bound DRAM-streaming characterization.
+    </Total_Memory_Footprint>
+  </Data_Shape>
+</Context_Normalization>

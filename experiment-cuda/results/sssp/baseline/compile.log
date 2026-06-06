@@ -1,5 +1,5 @@
 === compile.sh | sssp/baseline ===
-=== arch: sm_86 | 2026-06-06T01:11:14+08:00 ===
+=== arch: sm_86 | 2026-06-06T17:08:25+08:00 ===
 === nvcc: release 13.2 ===
 
 /home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/sssp/baseline/support/verify.h(54): warning #1650-D: result of call is not used
@@ -12,35 +12,35 @@ Remark: The warnings can be suppressed with "-diag-suppress <warning-number>"
       fscanf(fpo, "%d %d", &j, &cost);
       ^
 
-/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/sssp/baseline/main.cu(125): warning #1650-D: result of call is not used
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/sssp/baseline/main.cu(191): warning #1650-D: result of call is not used
     fscanf(fp, "%d", &n_nodes);
     ^
 
-/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/sssp/baseline/main.cu(126): warning #1650-D: result of call is not used
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/sssp/baseline/main.cu(192): warning #1650-D: result of call is not used
     fscanf(fp, "%d", &n_edges);
     ^
 
-/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/sssp/baseline/main.cu(138): warning #1650-D: result of call is not used
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/sssp/baseline/main.cu(204): warning #1650-D: result of call is not used
     fscanf(fp, "%d", &n_nodes);
     ^
 
-/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/sssp/baseline/main.cu(139): warning #1650-D: result of call is not used
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/sssp/baseline/main.cu(205): warning #1650-D: result of call is not used
     fscanf(fp, "%d", &n_edges);
     ^
 
-/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/sssp/baseline/main.cu(140): warning #1650-D: result of call is not used
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/sssp/baseline/main.cu(206): warning #1650-D: result of call is not used
     fscanf(fp, "%d", &source);
     ^
 
-/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/sssp/baseline/main.cu(146): warning #1650-D: result of call is not used
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/sssp/baseline/main.cu(212): warning #1650-D: result of call is not used
       fscanf(fp, "%d %d", &start, &edgeno);
       ^
 
-/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/sssp/baseline/main.cu(158): warning #1650-D: result of call is not used
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/sssp/baseline/main.cu(224): warning #1650-D: result of call is not used
       fscanf(fp, "%d", &id);
       ^
 
-/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/sssp/baseline/main.cu(159): warning #1650-D: result of call is not used
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/sssp/baseline/main.cu(225): warning #1650-D: result of call is not used
       fscanf(fp, "%d", &cost);
       ^
 
@@ -54,63 +54,63 @@ Remark: The warnings can be suppressed with "-diag-suppress <warning-number>"
       fscanf(fpo, "%d %d", &j, &cost);
       ^
 
-/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/sssp/baseline/main.cu(125): warning #1650-D: result of call is not used
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/sssp/baseline/main.cu(191): warning #1650-D: result of call is not used
     fscanf(fp, "%d", &n_nodes);
     ^
 
-/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/sssp/baseline/main.cu(126): warning #1650-D: result of call is not used
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/sssp/baseline/main.cu(192): warning #1650-D: result of call is not used
     fscanf(fp, "%d", &n_edges);
     ^
 
-/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/sssp/baseline/main.cu(138): warning #1650-D: result of call is not used
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/sssp/baseline/main.cu(204): warning #1650-D: result of call is not used
     fscanf(fp, "%d", &n_nodes);
     ^
 
-/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/sssp/baseline/main.cu(139): warning #1650-D: result of call is not used
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/sssp/baseline/main.cu(205): warning #1650-D: result of call is not used
     fscanf(fp, "%d", &n_edges);
     ^
 
-/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/sssp/baseline/main.cu(140): warning #1650-D: result of call is not used
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/sssp/baseline/main.cu(206): warning #1650-D: result of call is not used
     fscanf(fp, "%d", &source);
     ^
 
-/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/sssp/baseline/main.cu(146): warning #1650-D: result of call is not used
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/sssp/baseline/main.cu(212): warning #1650-D: result of call is not used
       fscanf(fp, "%d %d", &start, &edgeno);
       ^
 
-/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/sssp/baseline/main.cu(158): warning #1650-D: result of call is not used
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/sssp/baseline/main.cu(224): warning #1650-D: result of call is not used
       fscanf(fp, "%d", &id);
       ^
 
-/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/sssp/baseline/main.cu(159): warning #1650-D: result of call is not used
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/sssp/baseline/main.cu(225): warning #1650-D: result of call is not used
       fscanf(fp, "%d", &cost);
       ^
 
 /home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/sssp/baseline/main.cu: In function ‘int read_input_size(int&, int&, const Params&)’:
-/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/sssp/baseline/main.cu:125:7: warning: ignoring return value of ‘int fscanf(FILE*, const char*, ...)’ declared with attribute ‘warn_unused_result’ [-Wunused-result]
-  125 |   fscanf(fp, "%d", &n_nodes);
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/sssp/baseline/main.cu:191:7: warning: ignoring return value of ‘int fscanf(FILE*, const char*, ...)’ declared with attribute ‘warn_unused_result’ [-Wunused-result]
+  191 |   fscanf(fp, "%d", &n_nodes);
       |   ~~~~^~~~~~~~~~~~~~~~~~~~
-/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/sssp/baseline/main.cu:126:7: warning: ignoring return value of ‘int fscanf(FILE*, const char*, ...)’ declared with attribute ‘warn_unused_result’ [-Wunused-result]
-  126 |   fscanf(fp, "%d", &n_edges);
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/sssp/baseline/main.cu:192:7: warning: ignoring return value of ‘int fscanf(FILE*, const char*, ...)’ declared with attribute ‘warn_unused_result’ [-Wunused-result]
+  192 |   fscanf(fp, "%d", &n_edges);
       |   ~~~~^~~~~~~~~~~~~~~~~~~~
 /home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/sssp/baseline/main.cu: In function ‘void read_input(int&, Node*&, Edge*&, const Params&)’:
-/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/sssp/baseline/main.cu:138:7: warning: ignoring return value of ‘int fscanf(FILE*, const char*, ...)’ declared with attribute ‘warn_unused_result’ [-Wunused-result]
-  138 |   fscanf(fp, "%d", &n_nodes);
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/sssp/baseline/main.cu:204:7: warning: ignoring return value of ‘int fscanf(FILE*, const char*, ...)’ declared with attribute ‘warn_unused_result’ [-Wunused-result]
+  204 |   fscanf(fp, "%d", &n_nodes);
       |   ~~~~^~~~~~~~~~~~~~~~~~~~
-/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/sssp/baseline/main.cu:139:7: warning: ignoring return value of ‘int fscanf(FILE*, const char*, ...)’ declared with attribute ‘warn_unused_result’ [-Wunused-result]
-  139 |   fscanf(fp, "%d", &n_edges);
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/sssp/baseline/main.cu:205:7: warning: ignoring return value of ‘int fscanf(FILE*, const char*, ...)’ declared with attribute ‘warn_unused_result’ [-Wunused-result]
+  205 |   fscanf(fp, "%d", &n_edges);
       |   ~~~~^~~~~~~~~~~~~~~~~~~~
-/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/sssp/baseline/main.cu:140:7: warning: ignoring return value of ‘int fscanf(FILE*, const char*, ...)’ declared with attribute ‘warn_unused_result’ [-Wunused-result]
-  140 |   fscanf(fp, "%d", &source);
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/sssp/baseline/main.cu:206:7: warning: ignoring return value of ‘int fscanf(FILE*, const char*, ...)’ declared with attribute ‘warn_unused_result’ [-Wunused-result]
+  206 |   fscanf(fp, "%d", &source);
       |   ~~~~^~~~~~~~~~~~~~~~~~~
-/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/sssp/baseline/main.cu:146:7: warning: ignoring return value of ‘int fscanf(FILE*, const char*, ...)’ declared with attribute ‘warn_unused_result’ [-Wunused-result]
-  146 |     fscanf(fp, "%d %d", &start, &edgeno);
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/sssp/baseline/main.cu:212:7: warning: ignoring return value of ‘int fscanf(FILE*, const char*, ...)’ declared with attribute ‘warn_unused_result’ [-Wunused-result]
+  212 |     fscanf(fp, "%d %d", &start, &edgeno);
       |     ~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/sssp/baseline/main.cu:158:7: warning: ignoring return value of ‘int fscanf(FILE*, const char*, ...)’ declared with attribute ‘warn_unused_result’ [-Wunused-result]
-  158 |     fscanf(fp, "%d", &id);
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/sssp/baseline/main.cu:224:7: warning: ignoring return value of ‘int fscanf(FILE*, const char*, ...)’ declared with attribute ‘warn_unused_result’ [-Wunused-result]
+  224 |     fscanf(fp, "%d", &id);
       |     ~~^~~~~~~~~~~~~~~
-/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/sssp/baseline/main.cu:159:7: warning: ignoring return value of ‘int fscanf(FILE*, const char*, ...)’ declared with attribute ‘warn_unused_result’ [-Wunused-result]
-  159 |     fscanf(fp, "%d", &cost);
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/sssp/baseline/main.cu:225:7: warning: ignoring return value of ‘int fscanf(FILE*, const char*, ...)’ declared with attribute ‘warn_unused_result’ [-Wunused-result]
+  225 |     fscanf(fp, "%d", &cost);
       |     ~~^~~~~~~~~~~~~~~~~
 /home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/sssp/baseline/support/verify.h: In function ‘bool verify(std::atomic_int*, int, const char*)’:
 /home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/sssp/baseline/support/verify.h:54:7: warning: ignoring return value of ‘int fscanf(FILE*, const char*, ...)’ declared with attribute ‘warn_unused_result’ [-Wunused-result]

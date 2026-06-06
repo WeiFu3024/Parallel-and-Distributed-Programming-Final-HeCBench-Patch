@@ -1,0 +1,115 @@
+<Context_Normalization>
+  <Problem_Classification>
+    <Domain>Lossless Data Compression (GPU-accelerated)</Domain>
+    <Algorithm>Parallel LZ77-style sliding-window dictionary compression with prefix-sum compaction</Algorithm>
+    <Algorithm_Purpose>Compresses an input byte stream by replacing repeated symbol sequences within a fixed-size lookahead window with (length, offset) back-references, and decompresses by replaying those references. Each independent block produces a flag-bit array (1 bit per token indicating literal vs. match) and a packed payload of literals and (length, offset) pairs.</Algorithm_Purpose>
+    <Algorithm_Steps>
+      1. Host reads binary input, pads to a multiple of BLOCK_SIZE (2048 B), copies to device.
+      2. compressKernelI (one CUDA block per 2048 B data block, 128 threads/block):
+         a. Cooperatively loads the entire 2048-B block (512 × uint32_t) into shared memory `buffer`.
+         b. Each thread, over 4 iterations (512/128), independently scans a sliding window of up to WINDOW_SIZE=32 previous elements to find the longest match for its position; writes (maxLen, maxOffset) into `lengthBuffer`/`offsetBuffer`.
+         c. Thread 0 serially walks the 512 positions, builds the byte-packed flag array `byteFlagArr` and fills `prefixBuffer` with per-token output sizes (sizeof(T)=4 for literal, 2 for match), skipping `len` positions on each match.
+         d. In-place Blelloch (up-sweep / down-sweep) exclusive scan over `prefixBuffer` (size 512) using the 128 threads.
+         e. Per-block compressed size and flag-array size are written to `compressedDataSizeGlobal[blockIdx]` and `flagArrSizeGlobal[blockIdx]`.
+         f. Each thread writes its literal (sizeof(T) bytes) or (length, offset) pair (2 bytes) into a per-block-strided temporary global buffer `tmpCompressedDataGlobal`.
+         g. Thread 0 copies the byte-packed flag array to `tmpFlagArrGlobal`.
+      3. Host runs two CUB `DeviceScan::ExclusiveSum`s to convert per-block sizes into global offsets (`flagArrOffsetGlobal`, `compressedDataOffsetGlobal`).
+      4. compressKernelIII (one CUDA block per data block, 128 threads/block): performs a strided compaction copy from the per-block temp buffers into the dense `flagArrGlobal`/`compressedDataGlobal`.
+      5. decompressKernel (32-thread blocks, one thread per data block): each thread sequentially reads the flag bits for its block, emits a literal (copy sizeof(T) bytes) or replays a (length, offset) match into the output buffer until 512 elements are produced.
+    </Algorithm_Steps>
+    <Reference_Complexity>
+      Time: O(N · W) for compression, where N is the number of input symbols and W = WINDOW_SIZE = 32 (per-symbol match search is O(W)). Decompression is O(N) work. Critical path: compression has an O(B) serial segment per block (thread-0 flag/prefix construction, where B = 512 symbols/block); decompression is fully serial per block, so wall-clock ∝ O(B) per block. Scan adds O(N/B · log(N/B)) host-side work and O(N/B) device work.
+      Space: O(N) for input/output; auxiliary device memory ≈ 6–8 × original file size (deviceArray + deviceOutput + tmp/final flag & data arrays, each sized to worst case sizeof(T)·N or N/8 bytes), plus 4 × (numBlocks+1) × uint32_t for size/offset arrays.
+    </Reference_Complexity>
+  </Problem_Classification>
+  <Bottleneck_Analysis>
+    <Classification>Mixed, leaning Latency-bound. compressKernelI is throttled by (a) the serial thread-0 flag/prefix-init loop and (b) low occupancy from tiny launch geometry; decompressKernel is severely latency-bound with only 1 thread per data block.</Classification>
+    <Arithmetic_Intensity>
+      Effectively ~0 FLOP/Byte (no floating-point ops; algorithm is integer comparisons, byte stores, and bit manipulation). Treated as ops/byte: the inner match loop performs up to W=32 element comparisons per symbol, i.e. ≤32 cmp ops per 4 bytes read ⇒ ≤8 integer-ops/byte at the inner loop, but global traffic per symbol is roughly 2× sizeof(T) (read input + write at most one temp byte/4 bytes), giving an effective compute-to-DRAM-traffic ratio of ~1–4 integer-ops per byte of DRAM traffic.
+    </Arithmetic_Intensity>
+    <Ridge_Point_Comparison>
+      A6000 ridge ≈ 38.7 TFLOP/s ÷ 768 GB/s ≈ 50 FLOP/Byte for FP32. The workload's ~0 FLOP/Byte (or ≤8 int-ops/Byte) is FAR BELOW the ridge — i.e. firmly on the memory/latency side of the roofline. However, achieved bandwidth will be much lower than peak because (i) accesses to `tmpCompressedDataGlobal` are sparse/strided per block (one literal or 2-byte pair per thread at non-contiguous offsets `tmpOffset = prefixBuffer[tid]`), and (ii) decompress launches only 32 threads/block with one block per 512-element chunk, so the kernel cannot saturate DRAM at all.
+    </Ridge_Point_Comparison>
+    <Dominant_Limiter>
+      compressKernelI: serialization in thread 0 (flag/prefix-init loop of 512 iterations), uncoalesced writes during phase-one emit (each thread writes to `prefixBuffer[tid]`-derived variable-stride offsets), and low occupancy due to small block count (file_size / 2048).
+      compressKernelIII: pure memcpy-style compaction; bandwidth-bound but with strided source pattern (`blockSize·sizeof(T)·blockIdx + tid`).
+      decompressKernel: extreme thread under-utilization — each thread decodes an entire 2048-B block serially with data-dependent control flow; this is the dominant overall limiter and explains why a separate timing loop is needed.
+    </Dominant_Limiter>
+  </Bottleneck_Analysis>
+  <Memory_Access_Profile>
+    <Pattern>
+      Input load (compressKernelI): coalesced streaming (threads 0..127 load consecutive `INPUT_TYPE`s, repeated 4×).
+      Match search: sliding-window reads inside shared memory — no global traffic, but bank-conflict-prone (multiple threads scan overlapping window regions).
+      Phase-one emit: gather-scatter into `tmpCompressedDataGlobal` at `tmpCompressedDataGlobalOffset + prefixBuffer[tid]` — variable strides depending on match density (uncoalesced).
+      Compaction kernel: streaming read of sparse temp buffer + streaming write to dense buffer.
+      Decompression: per-block sequential walk with random back-references of distance ≤ WINDOW_SIZE inside its own 512-element output region; output stride between blocks = 2048 B, so neighboring threads in the warp touch addresses 2048 B apart (uncoalesced).
+    </Pattern>
+    <Read_Write_Ratio>
+      Compression end-to-end ≈ 2:3 reads:writes (one full read of input + reads of temp buffers; writes to tmp flag/data, then again to final flag/data during compaction, plus offset arrays). Per-token: ~1 read (4 B) to ~1 write (4 B literal or 2 B match) ≈ 1:0.5–1.
+      Decompression ≈ 1:1 (read flag+payload bytes, write decoded uint32_t output; plus intra-block back-reference reads of the just-written output).
+    </Read_Write_Ratio>
+    <Reuse_Factor>
+      Input symbols in shared memory: each `buffer[i]` is read up to W=32 times by the sliding-window match search of subsequent positions ⇒ reuse ≈ 32× (achieved via shared memory, so no extra DRAM traffic).
+      Global memory reuse: ~1× (each input byte touched once by the input load; each compressed byte written once to tmp and once to final ⇒ 2× write amplification due to the two-phase scheme).
+    </Reuse_Factor>
+    <Coalescing_Feasibility>
+      Input load and decompression output: Natural coalescing on input load; decompression output is NOT naturally coalesced (one thread per block, stride 2048 B between warp lanes) — Requires transformation (cooperative decode within a warp/block).
+      Phase-one emit and compaction: Requires transformation — current scheme writes per-token variable-length records at per-thread offsets, making warp-level coalescing impossible; a warp-cooperative packing (e.g. ballot + warp-prefix-sum and 32-byte/128-byte aligned writes) would be needed.
+    </Coalescing_Feasibility>
+    <Optimal_Tiling_Hint>
+      Keep the per-block tile at 2048 B (= 512 × uint32_t) — matches the dictionary semantics and stays well under shared-memory limits. Per-block shared memory budget (current): buffer 2048 B + length 512 B + offset 512 B + prefix 2052 B + byteFlag 64 B ≈ 5.2 KB, leaving ample headroom (A6000 allows up to 100 KB / SM opt-in, 48 KB / block default). Suggested improvements: (1) raise threads/block to 256 or 512 so the inner match loop iterates 2× or 1× (currently 4×) and the scan and emit become wider; (2) replace the serial thread-0 flag/prefix-init loop with a warp-cooperative segmented scan over the lengthBuffer to eliminate the 512-iteration serial section; (3) for decompression, use one CUDA block (32–128 threads) per data block with cooperative bit-stream decoding instead of one thread per block.
+    </Optimal_Tiling_Hint>
+  </Memory_Access_Profile>
+  <Parallelism_Structure>
+    <Granularity>
+      compressKernelI/III: 1 CUDA block per 2048-B data block; 128 threads per block; each thread handles 4 input symbols (512/128) sequentially within the block.
+      decompressKernel: 1 CUDA thread per 2048-B data block (blockDim = 32, gridDim = ceil(numBlocks/32)) — a thread handles 512 uint32_t outputs sequentially.
+    </Granularity>
+    <Independence>
+      Data blocks are Fully independent of each other (no cross-block back-references — sliding window is clamped to bufferStart). Within a block, the match-search step is fully parallel across threads; the flag-array and prefix-size initialization in compressKernelI carries a sequential RAW dependency along the position axis (each match consumes `len` subsequent positions), so the current implementation serializes it on thread 0; the subsequent Blelloch scan is Independent after reduction. Decompression within a block has a strict RAW dependency (each match copies from already-decoded positions), serializing the per-block walk.
+    </Independence>
+    <Synchronization>
+      compressKernelI: multiple `__syncthreads()` (after shared-memory load, after match-search/prefix-init, between up-sweep levels, between root-clearing and down-sweep, between down-sweep levels). No atomics. No grid-level sync — handled by separate kernel launches and host-side CUB scans.
+      compressKernelIII: none (independent strided copies).
+      decompressKernel: none (each thread fully independent on its own block).
+      Host-side: two `cub::DeviceScan::ExclusiveSum` invocations between kernels act as global barriers.
+    </Synchronization>
+    <Recommended_Block_Size>
+      For A6000 (max 1536 threads/SM, 1024/block, 16 blocks/SM cap): current 128 threads/block leaves the warp scheduler under-fed at 4 warps/block. Recommend 256 or 512 threads/block for compressKernelI (still fits the 512-element tile naturally with 2 or 1 elements per thread, removes the inner 4-iteration loop, and gives 8–16 warps/block for better latency hiding). For decompressKernel, the right answer is a redesign: 32–128 threads per data block (one warp cooperatively decoding one block) rather than the current 32 threads handling 32 independent blocks.
+    </Recommended_Block_Size>
+  </Parallelism_Structure>
+  <Hardware_Constraints>
+    <Architecture>NVIDIA Ampere (GA102)</Architecture>
+    <Compute_Capability>8.6</Compute_Capability>
+    <SM_Count>84</SM_Count>
+    <Max_Threads_Per_SM>1536</Max_Threads_Per_SM>
+    <Max_Threads_Per_Block>1024</Max_Threads_Per_Block>
+    <Warp_Size>32</Warp_Size>
+    <Shared_Memory_Per_Block>49152 B default (up to 102400 B opt-in via cudaFuncSetAttribute on CC 8.6)</Shared_Memory_Per_Block>
+    <Shared_Memory_Per_SM>102400 B (100 KB)</Shared_Memory_Per_SM>
+    <Registers_Per_Block>65536</Registers_Per_Block>
+    <Registers_Per_SM>65536</Registers_Per_SM>
+    <L2_Cache_Size>6291456 B (6 MB)</L2_Cache_Size>
+    <Constant_Memory>65536 B (64 KB)</Constant_Memory>
+    <Memory_Bus_Width>384 bits</Memory_Bus_Width>
+    <Peak_Memory_Bandwidth>~768 GB/s (384-bit GDDR6 @ 16 Gbps)</Peak_Memory_Bandwidth>
+    <GPU_Clock_Rate>2100 MHz (max boost, per nvidia-smi)</GPU_Clock_Rate>
+  </Hardware_Constraints>
+  <Data_Shape>
+    <Input_Dimensions>
+      1-D byte stream of `fileSize` bytes (runtime-dependent; supplied via `-i`), padded up to a multiple of BLOCK_SIZE = 2048 B. After padding: `datatypeSize = (fileSize + pad) / 4` uint32_t elements, partitioned into `numOfBlocks = datatypeSize · 4 / 2048` independent 512-element blocks. Within each block: sliding window of 32 elements, lookahead of up to 512 − bufferStart elements.
+    </Input_Dimensions>
+    <Data_Type>uint32_t (INPUT_TYPE) for the symbol stream; uint8_t for flag bits, length, and offset fields; uint32_t for per-block sizes and offsets.</Data_Type>
+    <Total_Memory_Footprint>
+      Let F = fileSize, P = pad-to-2048, D = (F+P)/4, B = (F+P)/2048. Device-side allocations:
+        deviceArray + deviceOutput:                  2 · (F+P)              ≈ 2 · F
+        flagArrSize/Offset + compressedDataSize/Offset: 4 · 4 · (B+1)        ≈ 16 · F/2048 = F/128
+        tmpFlagArrGlobal + flagArrGlobal:            2 · D/8                = (F+P)/4
+        tmpCompressedDataGlobal + compressedDataGlobal: 2 · 4 · D           = 2 · (F+P)
+      Total device memory ≈ 4.25 × (F+P) ≈ 4.25 × F (plus negligible CUB scan scratch).
+      Per-CTA shared memory in compressKernelI ≈ 5188 B (buffer 2048 + length 512 + offset 512 + prefix 2052 + byteFlag 64).
+      Host-side mirror buffers add a similar ≈ 2.25 × F on the host side.
+      Example: for a 256 MB input, device footprint ≈ 1.1 GB.
+    </Total_Memory_Footprint>
+  </Data_Shape>
+</Context_Normalization>

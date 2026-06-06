@@ -1,0 +1,199 @@
+<Nsight_Profile>
+
+<Kernel_Profile>
+
+  <Kernel rank="1">
+    <Execution>
+      <Kernel_Name>void cutlass::Kernel2<cutlass_80_tensorop_d884gemm_64x32_16x4_nn_align1>(T1::Params)</Kernel_Name>
+      <Kernel_Time_ms>266.0137</Kernel_Time_ms>
+      <Grid_Size>8192</Grid_Size>
+      <Block_Size>128</Block_Size>
+    </Execution>
+    <Occupancy>
+      <Achieved>16.61%</Achieved>
+      <Theoretical_Max>16.67%</Theoretical_Max>
+      <Limiting_Factor>registers</Limiting_Factor>
+    </Occupancy>
+    <Memory>
+      <Global_Load_Throughput>11.88 GB/s</Global_Load_Throughput>
+      <Global_Store_Throughput>0.00 GB/s</Global_Store_Throughput>
+      <Shared_Memory_Throughput>0.00 GB/s</Shared_Memory_Throughput>
+      <L1_Hit_Rate>0.42%</L1_Hit_Rate>
+      <L2_Hit_Rate>88.43%</L2_Hit_Rate>
+      <DRAM_Utilization>1.63%</DRAM_Utilization>
+    </Memory>
+    <Compute>
+      <SM_Utilization>96.83%</SM_Utilization>
+      <FP32_Utilization>N/A%</FP32_Utilization>
+      <Warp_Execution_Efficiency>N/A</Warp_Execution_Efficiency>
+    </Compute>
+    <Stall_Analysis>
+      <Top_Stalls>
+        <Stall reason="unknown" percentage="N/A"/>
+      </Top_Stalls>
+    </Stall_Analysis>
+  </Kernel>
+
+  <Kernel rank="2">
+    <Execution>
+      <Kernel_Name>void matrix_mul<double>(T1 *, T1 *, T1 *, int, int, int, T1, T1)</Kernel_Name>
+      <Kernel_Time_ms>235.1798</Kernel_Time_ms>
+      <Grid_Size>65536</Grid_Size>
+      <Block_Size>256</Block_Size>
+    </Execution>
+    <Occupancy>
+      <Achieved>99.74%</Achieved>
+      <Theoretical_Max>100%</Theoretical_Max>
+      <Limiting_Factor>block_size</Limiting_Factor>
+    </Occupancy>
+    <Memory>
+      <Global_Load_Throughput>149.05 GB/s</Global_Load_Throughput>
+      <Global_Store_Throughput>0.00 GB/s</Global_Store_Throughput>
+      <Shared_Memory_Throughput>0.00 GB/s</Shared_Memory_Throughput>
+      <L1_Hit_Rate>82.96%</L1_Hit_Rate>
+      <L2_Hit_Rate>50.40%</L2_Hit_Rate>
+      <DRAM_Utilization>20.45%</DRAM_Utilization>
+    </Memory>
+    <Compute>
+      <SM_Utilization>96.67%</SM_Utilization>
+      <FP32_Utilization>N/A%</FP32_Utilization>
+      <Warp_Execution_Efficiency>N/A</Warp_Execution_Efficiency>
+    </Compute>
+    <Stall_Analysis>
+      <Top_Stalls>
+        <Stall reason="unknown" percentage="N/A"/>
+      </Top_Stalls>
+    </Stall_Analysis>
+  </Kernel>
+
+  <Kernel rank="3">
+    <Execution>
+      <Kernel_Name>void matrix_mul<float>(T1 *, T1 *, T1 *, int, int, int, T1, T1)</Kernel_Name>
+      <Kernel_Time_ms>62.1235</Kernel_Time_ms>
+      <Grid_Size>65536</Grid_Size>
+      <Block_Size>256</Block_Size>
+    </Execution>
+    <Occupancy>
+      <Achieved>99.68%</Achieved>
+      <Theoretical_Max>100%</Theoretical_Max>
+      <Limiting_Factor>block_size</Limiting_Factor>
+    </Occupancy>
+    <Memory>
+      <Global_Load_Throughput>281.22 GB/s</Global_Load_Throughput>
+      <Global_Store_Throughput>0.00 GB/s</Global_Store_Throughput>
+      <Shared_Memory_Throughput>0.00 GB/s</Shared_Memory_Throughput>
+      <L1_Hit_Rate>87.37%</L1_Hit_Rate>
+      <L2_Hit_Rate>49.91%</L2_Hit_Rate>
+      <DRAM_Utilization>38.58%</DRAM_Utilization>
+    </Memory>
+    <Compute>
+      <SM_Utilization>97.42%</SM_Utilization>
+      <FP32_Utilization>N/A%</FP32_Utilization>
+      <Warp_Execution_Efficiency>N/A</Warp_Execution_Efficiency>
+    </Compute>
+    <Stall_Analysis>
+      <Top_Stalls>
+        <Stall reason="unknown" percentage="N/A"/>
+      </Top_Stalls>
+    </Stall_Analysis>
+  </Kernel>
+
+  <Kernel rank="4">
+    <Execution>
+      <Kernel_Name>void matrix_mul<__half>(T1 *, T1 *, T1 *, int, int, int, T1, T1)</Kernel_Name>
+      <Kernel_Time_ms>59.3845</Kernel_Time_ms>
+      <Grid_Size>65536</Grid_Size>
+      <Block_Size>256</Block_Size>
+    </Execution>
+    <Occupancy>
+      <Achieved>99.72%</Achieved>
+      <Theoretical_Max>100%</Theoretical_Max>
+      <Limiting_Factor>block_size</Limiting_Factor>
+    </Occupancy>
+    <Memory>
+      <Global_Load_Throughput>146.59 GB/s</Global_Load_Throughput>
+      <Global_Store_Throughput>0.00 GB/s</Global_Store_Throughput>
+      <Shared_Memory_Throughput>0.00 GB/s</Shared_Memory_Throughput>
+      <L1_Hit_Rate>91.64%</L1_Hit_Rate>
+      <L2_Hit_Rate>49.83%</L2_Hit_Rate>
+      <DRAM_Utilization>20.11%</DRAM_Utilization>
+    </Memory>
+    <Compute>
+      <SM_Utilization>96.84%</SM_Utilization>
+      <FP32_Utilization>N/A%</FP32_Utilization>
+      <Warp_Execution_Efficiency>N/A</Warp_Execution_Efficiency>
+    </Compute>
+    <Stall_Analysis>
+      <Top_Stalls>
+        <Stall reason="unknown" percentage="N/A"/>
+      </Top_Stalls>
+    </Stall_Analysis>
+  </Kernel>
+
+  <Kernel rank="5">
+    <Execution>
+      <Kernel_Name>void cutlass::Kernel2<cutlass_80_simt_sgemm_256x128_8x4_nn_align1>(T1::Params)</Kernel_Name>
+      <Kernel_Time_ms>5.2858</Kernel_Time_ms>
+      <Grid_Size>512</Grid_Size>
+      <Block_Size>256</Block_Size>
+    </Execution>
+    <Occupancy>
+      <Achieved>16.68%</Achieved>
+      <Theoretical_Max>16.67%</Theoretical_Max>
+      <Limiting_Factor>registers</Limiting_Factor>
+    </Occupancy>
+    <Memory>
+      <Global_Load_Throughput>114.63 GB/s</Global_Load_Throughput>
+      <Global_Store_Throughput>0.00 GB/s</Global_Store_Throughput>
+      <Shared_Memory_Throughput>0.00 GB/s</Shared_Memory_Throughput>
+      <L1_Hit_Rate>1.97%</L1_Hit_Rate>
+      <L2_Hit_Rate>86.78%</L2_Hit_Rate>
+      <DRAM_Utilization>15.73%</DRAM_Utilization>
+    </Memory>
+    <Compute>
+      <SM_Utilization>76.64%</SM_Utilization>
+      <FP32_Utilization>N/A%</FP32_Utilization>
+      <Warp_Execution_Efficiency>N/A</Warp_Execution_Efficiency>
+    </Compute>
+    <Stall_Analysis>
+      <Top_Stalls>
+        <Stall reason="unknown" percentage="N/A"/>
+      </Top_Stalls>
+    </Stall_Analysis>
+  </Kernel>
+
+  <Kernel rank="6">
+    <Execution>
+      <Kernel_Name>ampere_h16816gemm_256x128_ldg8_stages_32x3_nn</Kernel_Name>
+      <Kernel_Time_ms>1.0857</Kernel_Time_ms>
+      <Grid_Size>512</Grid_Size>
+      <Block_Size>256</Block_Size>
+    </Execution>
+    <Occupancy>
+      <Achieved>16.66%</Achieved>
+      <Theoretical_Max>16.67%</Theoretical_Max>
+      <Limiting_Factor>registers</Limiting_Factor>
+    </Occupancy>
+    <Memory>
+      <Global_Load_Throughput>238.75 GB/s</Global_Load_Throughput>
+      <Global_Store_Throughput>0.00 GB/s</Global_Store_Throughput>
+      <Shared_Memory_Throughput>0.00 GB/s</Shared_Memory_Throughput>
+      <L1_Hit_Rate>0%</L1_Hit_Rate>
+      <L2_Hit_Rate>90.09%</L2_Hit_Rate>
+      <DRAM_Utilization>32.75%</DRAM_Utilization>
+    </Memory>
+    <Compute>
+      <SM_Utilization>81.83%</SM_Utilization>
+      <FP32_Utilization>N/A%</FP32_Utilization>
+      <Warp_Execution_Efficiency>N/A</Warp_Execution_Efficiency>
+    </Compute>
+    <Stall_Analysis>
+      <Top_Stalls>
+        <Stall reason="unknown" percentage="N/A"/>
+      </Top_Stalls>
+    </Stall_Analysis>
+  </Kernel>
+
+</Kernel_Profile>
+
+</Nsight_Profile>
