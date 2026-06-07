@@ -1,0 +1,39 @@
+<Nsight_Profile>
+
+<Kernel_Profile>
+
+  <Kernel rank="1">
+    <Execution>
+      <Kernel_Name>binomialOptionsKernel(const __TOptionData *, float *)</Kernel_Name>
+      <Kernel_Time_ms>0.7375</Kernel_Time_ms>
+      <Grid_Size>1024</Grid_Size>
+      <Block_Size>128</Block_Size>
+    </Execution>
+    <Occupancy>
+      <Achieved>84.11%</Achieved>
+      <Theoretical_Max>100%</Theoretical_Max>
+      <Limiting_Factor>block_size</Limiting_Factor>
+    </Occupancy>
+    <Memory>
+      <Global_Load_Throughput>0.19 GB/s</Global_Load_Throughput>
+      <Global_Store_Throughput>0.00 GB/s</Global_Store_Throughput>
+      <Shared_Memory_Throughput>0.00 GB/s</Shared_Memory_Throughput>
+      <L1_Hit_Rate>92.08%</L1_Hit_Rate>
+      <L2_Hit_Rate>62.88%</L2_Hit_Rate>
+      <DRAM_Utilization>0.03%</DRAM_Utilization>
+    </Memory>
+    <Compute>
+      <SM_Utilization>58.64%</SM_Utilization>
+      <FP32_Utilization>N/A%</FP32_Utilization>
+      <Warp_Execution_Efficiency>N/A</Warp_Execution_Efficiency>
+    </Compute>
+    <Stall_Analysis>
+      <Top_Stalls>
+        <Stall reason="unknown" percentage="N/A"/>
+      </Top_Stalls>
+    </Stall_Analysis>
+  </Kernel>
+
+</Kernel_Profile>
+
+</Nsight_Profile>

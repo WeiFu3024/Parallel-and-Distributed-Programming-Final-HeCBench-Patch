@@ -10,6 +10,10 @@
 # This will:
 #   1. Create experiment-cuda/results/{benchmark}/ with baseline/cell_a/cell_b/cell_c dirs
 #   2. Copy the original .cu file from HeCBench src/{bench}-cuda/ into baseline/ as main.cu
+#      EXCEPTION: the following benchmarks have a hand-merged single-file baseline that
+#      must NOT be overwritten by this script.  Re-initialising them only creates the
+#      directory skeleton; the existing baseline/main.cu is left untouched.
+#        binomial, fluidSim, heartwall, mcpr, sc, sssp
 #   3. Create round and attempt subdirectories
 
 set -euo pipefail
@@ -52,8 +56,23 @@ for bench in "${BENCHMARKS[@]}"; do
     *)             BENCH_SRC_FILE="" ;;  # will try main.cu then ${bench}.cu
   esac
 
+  # --- Benchmarks whose baseline/main.cu is hand-merged and must not be overwritten ---
+  case "${bench}" in
+    binomial|fluidSim|heartwall|mcpr|sc|sssp)
+      MERGED_BASELINE=true ;;
+    *)
+      MERGED_BASELINE=false ;;
+  esac
+
   # --- Find and copy baseline source (always stored as main.cu) ---
-  if [ -n "${BENCH_SRC_FILE}" ]; then
+  if $MERGED_BASELINE; then
+    if [ -f "${BASE}/baseline/main.cu" ]; then
+      echo "    SKIP: ${bench} uses a hand-merged baseline — existing baseline/main.cu preserved."
+    else
+      echo "    WARNING: ${bench} requires a hand-merged baseline but none found at ${BASE}/baseline/main.cu"
+      echo "             Please merge the sources manually (see operations_manual_cuda.md Step 0.2)."
+    fi
+  elif [ -n "${BENCH_SRC_FILE}" ]; then
     CUDA_SRC="${BENCH_SRC_DIR}/${BENCH_SRC_FILE}"
     if [ -f "${CUDA_SRC}" ]; then
       cp "${CUDA_SRC}" "${BASE}/baseline/main.cu"
@@ -90,8 +109,9 @@ done
 echo ""
 echo "Directory structure created. Next steps:"
 echo "  1. bash scripts/hardware_spec.sh > ${EXPERIMENT_DIR}/config/hardware_spec.txt"
-echo "  2. Copy system_prompt.txt to ${EXPERIMENT_DIR}/config/"
+echo "  2. system_prompt.txt already exists at ${EXPERIMENT_DIR}/config/system_prompt.txt"
 echo "  3. Profile each baseline: ncu --set full --csv ... > results/{bench}/baseline/nsight_raw.csv"
 echo "  4. Generate context.xml for each benchmark (analysis LLM)"
+echo "  NOTE: binomial, fluidSim, heartwall, mcpr, sc, sssp need hand-merged baseline/main.cu"
 echo ""
 echo "Done."

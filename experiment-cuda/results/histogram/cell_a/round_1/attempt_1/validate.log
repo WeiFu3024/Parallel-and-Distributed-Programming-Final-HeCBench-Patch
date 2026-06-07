@@ -1,0 +1,41 @@
+=== validate.sh | histogram/cell_a/round_1/attempt_1 ===
+=== 2026-06-07T17:51:55+08:00 ===
+
+--- $ main --i=1 ---
+Random image: entropy-reduction(0) width(1920) height(1080)
+
+1 channel uchar1 tests (256-bin):
+
+Shared memory atomics 	PASS
+Avg time 37.056 us (1 iterations)
+Global memory atomics 	PASS
+Avg time 71.392 us (1 iterations)
+Timings (us):
+	 37.056 smem atomics (55.959 GB/s, 136.484% peak)
+	 71.392 gmem atomics (29.045 GB/s, 70.842% peak)
+
+3/4 channel uchar4 tests (256-bin):
+
+Shared memory atomics 	PASS
+Avg time 53.312 us (1 iterations)
+Global memory atomics 	PASS
+Avg time 141.824 us (1 iterations)
+Timings (us):
+	 53.312 smem atomics (155.582 GB/s, 379.469% peak)
+	 141.824 gmem atomics (58.484 GB/s, 142.643% peak)
+
+3/4 channel float4 tests (256-bin):
+
+Shared memory atomics 	PASS
+Avg time 79.872 us (1 iterations)
+Global memory atomics 	PASS
+Avg time 144.128 us (1 iterations)
+Timings (us):
+	 79.872 smem atomics (415.385 GB/s, 1013.133% peak)
+	 144.128 gmem atomics (230.195 GB/s, 561.452% peak)
+
+
+
+
+
+VALIDATION: PASS

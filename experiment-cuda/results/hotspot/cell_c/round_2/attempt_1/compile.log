@@ -1,0 +1,6 @@
+=== compile.sh | hotspot/cell_c/round_2/attempt_1 ===
+=== arch: sm_86 | 2026-06-07T17:20:50+08:00 ===
+=== nvcc: release 13.2 ===
+
+
+COMPILE: SUCCESS

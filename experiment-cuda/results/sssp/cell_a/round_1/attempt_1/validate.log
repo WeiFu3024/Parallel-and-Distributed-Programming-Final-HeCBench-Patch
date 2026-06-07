@@ -1,0 +1,15 @@
+=== validate.sh | sssp/cell_a/round_1/attempt_1 ===
+=== 2026-06-07T17:51:47+08:00 ===
+
+--- $ main -g 120 -t 1 -w 10 -r 1 -f /home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/sssp_val_input.dat -c /home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/sssp_val_ref.out ---
+Number of nodes = 5000	Number of edges = 33043	Initialization time (ms): 4.927578
+Host/Device Allocation time (ms): 201.833103
+Copy To Device time (ms): 0.587457
+Kernel on Host time (ms): 0.373740
+Kernel on Device time (ms): 0.130927
+Copy Back and Merge time (ms): 0.157132
+Host/Device Deallocation time (ms): 0.154268
+PASS
+
+
+VALIDATION: PASS

@@ -1,0 +1,52 @@
+=== validate.sh | layernorm/cell_a/round_1/attempt_1 ===
+=== 2026-06-07T17:50:35+08:00 ===
+
+--- $ main 8 1024 768 10 ---
+Using kernel 0
+Checking block size 32.
+Checking block size 64.
+Checking block size 128.
+Checking block size 256.
+Checking block size 512.
+Checking block size 1024.
+All results match. Starting benchmarks.
+
+block_size   32 | time 0.1104 ms | bandwidth 455.92 GB/s
+block_size   64 | time 0.1151 ms | bandwidth 437.19 GB/s
+block_size  128 | time 0.0907 ms | bandwidth 554.82 GB/s
+block_size  256 | time 0.0823 ms | bandwidth 611.62 GB/s
+block_size  512 | time 0.1088 ms | bandwidth 462.48 GB/s
+block_size 1024 | time 0.2089 ms | bandwidth 240.88 GB/s
+Using kernel 1
+Checking block size 32.
+Checking block size 64.
+Checking block size 128.
+Checking block size 256.
+Checking block size 512.
+Checking block size 1024.
+All results match. Starting benchmarks.
+
+block_size   32 | time 0.0913 ms | bandwidth 551.43 GB/s
+block_size   64 | time 0.0971 ms | bandwidth 518.43 GB/s
+block_size  128 | time 0.1262 ms | bandwidth 398.80 GB/s
+block_size  256 | time 0.1184 ms | bandwidth 425.19 GB/s
+block_size  512 | time 0.1172 ms | bandwidth 429.61 GB/s
+block_size 1024 | time 0.0911 ms | bandwidth 552.23 GB/s
+Using kernel 2
+Checking block size 32.
+Checking block size 64.
+Checking block size 128.
+Checking block size 256.
+Checking block size 512.
+Checking block size 1024.
+All results match. Starting benchmarks.
+
+block_size   32 | time 0.0912 ms | bandwidth 551.70 GB/s
+block_size   64 | time 0.0933 ms | bandwidth 539.51 GB/s
+block_size  128 | time 0.1007 ms | bandwidth 499.89 GB/s
+block_size  256 | time 0.0976 ms | bandwidth 515.56 GB/s
+block_size  512 | time 0.0992 ms | bandwidth 507.21 GB/s
+block_size 1024 | time 0.0921 ms | bandwidth 546.66 GB/s
+
+
+VALIDATION: PASS

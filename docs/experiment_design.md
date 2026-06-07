@@ -14,7 +14,7 @@ Do not include explanatory text outside of code comments.
 
 <Constraints>
   - Do NOT search the internet or reference external documentation.
-  - Do NOT use acceleration libraries (cuBLAS, cuFFT, cuDNN, Thrust).
+  - Do NOT add new uses of acceleration libraries (cuBLAS, cuFFT, cuDNN, Thrust) that are not already present in the baseline code.
   - Do NOT modify host-side validation logic or input data generation.
   - Do NOT change data types or problem sizes from the original code.
   - You do NOT have access to a compiler, profiler, or runtime environment.

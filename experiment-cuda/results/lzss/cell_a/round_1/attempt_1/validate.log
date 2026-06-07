@@ -1,0 +1,10 @@
+=== validate.sh | lzss/cell_a/round_1/attempt_1 ===
+=== 2026-06-07T17:52:06+08:00 ===
+
+--- $ main -i /home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/heartwall/baseline/main.cu -n 1 ---
+compression ratio: 1.5958
+compression e2e throughput: 0.0728813 GB/s
+decompression e2e throughput: 0.273959 GB/s
+
+
+VALIDATION: PASS

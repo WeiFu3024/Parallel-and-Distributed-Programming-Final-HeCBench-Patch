@@ -1,0 +1,30 @@
+=== validate.sh | convolution3D/cell_a/round_1/attempt_1 ===
+=== 2026-06-07T17:49:27+08:00 ===
+
+--- $ main 32 96 256 26 26 5 1 ---
+3D convolution (FP32)
+
+========== Warmup start ==========
+input dimensions: C=96 Win=26 Hin=26
+output dimensions: M=256 Wout=22 Hout=22
+3D grid dimensions: N=32 M=256 Z=4
+Average kernel execution time of conv3d_s1 kernel: 13334.716797 (us)
+PASS
+Average kernel execution time of conv3d_s2 kernel: 12734.861328 (us)
+PASS
+Average kernel execution time of conv3d_s3 kernel: 13053.751953 (us)
+PASS
+
+========== Warmup done ==========
+input dimensions: C=96 Win=26 Hin=26
+output dimensions: M=256 Wout=22 Hout=22
+3D grid dimensions: N=32 M=256 Z=4
+Average kernel execution time of conv3d_s1 kernel: 12903.248047 (us)
+PASS
+Average kernel execution time of conv3d_s2 kernel: 11967.716797 (us)
+PASS
+Average kernel execution time of conv3d_s3 kernel: 12284.674805 (us)
+PASS
+
+
+VALIDATION: PASS

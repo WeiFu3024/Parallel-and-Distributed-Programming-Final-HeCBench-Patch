@@ -1,0 +1,25 @@
+=== validate.sh | binomial/cell_a/round_1/attempt_1 ===
+=== 2026-06-07T17:50:56+08:00 ===
+
+--- $ main  ---
+[/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/binomial/cell_a/round_1/attempt_1/main] - Starting...
+Generating input data...
+Running GPU binomial tree...
+Average kernel execution time : 684.323792 (us)
+Options count            : 1024     
+Time steps               : 2048     
+Total binomialOptionsGPU() time: 883.405334 msec
+Options per second       : 1159.150757     
+Running CPU binomial tree...
+Comparing the results...
+GPU binomial vs. Black-Scholes
+L1 norm: 2.220214E-04
+CPU binomial vs. Black-Scholes
+L1 norm: 2.220920E-04
+CPU binomial vs. GPU binomial
+Avg. diff: 1.978191E-06
+L1 norm: 7.997008E-07
+Test passed
+
+
+VALIDATION: PASS

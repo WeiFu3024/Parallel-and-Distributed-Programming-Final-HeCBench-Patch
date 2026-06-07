@@ -1,26 +1,26 @@
 === validate.sh | accuracy/cell_a/round_1/attempt_1 ===
-=== 2026-06-05T02:29:21+08:00 ===
+=== 2026-06-07T16:56:20+08:00 ===
 
---- $ main 8192 10000 10 100 ---
+--- $ main 8192 10000 10 10 ---
 Grid size is 2048
-Average execution time of accuracy kernel: 510.929657 (us)
+Average execution time of accuracy kernel: 564.583618 (us)
 PASS
-Average execution time of accuracy kernel2: 474.004211 (us)
+Average execution time of accuracy kernel2: 480.755127 (us)
 PASS
 Grid size is 4096
-Average execution time of accuracy kernel: 481.171356 (us)
+Average execution time of accuracy kernel: 481.530823 (us)
 PASS
-Average execution time of accuracy kernel2: 465.903839 (us)
+Average execution time of accuracy kernel2: 469.535828 (us)
 PASS
 Grid size is 6144
-Average execution time of accuracy kernel: 470.738647 (us)
+Average execution time of accuracy kernel: 471.172119 (us)
 PASS
-Average execution time of accuracy kernel2: 464.244141 (us)
+Average execution time of accuracy kernel2: 466.158020 (us)
 PASS
 Grid size is 8192
-Average execution time of accuracy kernel: 470.863831 (us)
+Average execution time of accuracy kernel: 472.193939 (us)
 PASS
-Average execution time of accuracy kernel2: 464.174652 (us)
+Average execution time of accuracy kernel2: 467.165710 (us)
 PASS
 
 

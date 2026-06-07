@@ -1,5 +1,5 @@
 === compile.sh | fluidSim/baseline ===
-=== arch: sm_86 | 2026-06-06T17:07:09+08:00 ===
+=== arch: sm_86 | 2026-06-07T17:15:42+08:00 ===
 === nvcc: release 13.2 ===
 
 /home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/fluidSim/baseline/main.cu(95): warning #1444-D: type "double4" was declared deprecated ("use double4_16a or double4_32a")
@@ -229,7 +229,7 @@ In file included from /usr/local/cuda-13.2/targets/x86_64-linux/include/driver_t
 /usr/local/cuda-13.2/targets/x86_64-linux/include/vector_types.h:564:104: note: declared here
   564 | typedef __device_builtin__ struct double4 __VECTOR_TYPE_DEPRECATED__("use double4_16a or double4_32a") double4;
       |                                                                                                        ^~~~~~~
-In file included from tmpxft_000d7dad_00000000-6_main.cudafe1.stub.c:1:
+In file included from tmpxft_00198c67_00000000-6_main.cudafe1.stub.c:1:
 /home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/fluidSim/baseline/main.cu: At global scope:
 /home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/fluidSim/baseline/main.cu:74:385: warning: ‘double4’ is deprecated: use double4_16a or double4_32a [-Wdeprecated-declarations]
    74 | __attribute__((weak)) __global__ void lbm (
@@ -255,27 +255,27 @@ In file included from tmpxft_000d7dad_00000000-6_main.cudafe1.stub.c:1:
 /usr/local/cuda-13.2/targets/x86_64-linux/include/vector_types.h:477:42: note: declared here
   477 | __device_builtin__ __builtin_align__(16) double4
       |                                          ^~~~~~~
-In file included from /tmp/tmpxft_000d7dad_00000000-6_main.cudafe1.stub.c:8:
-/tmp/tmpxft_000d7dad_00000000-6_main.cudafe1.stub.c: In function ‘void __nv_cudaEntityRegisterCallback(void**)’:
-/tmp/tmpxft_000d7dad_00000000-6_main.cudafe1.stub.c:1:453: warning: ‘double4’ is deprecated: use double4_16a or double4_32a [-Wdeprecated-declarations]
+In file included from /tmp/tmpxft_00198c67_00000000-6_main.cudafe1.stub.c:8:
+/tmp/tmpxft_00198c67_00000000-6_main.cudafe1.stub.c: In function ‘void __nv_cudaEntityRegisterCallback(void**)’:
+/tmp/tmpxft_00198c67_00000000-6_main.cudafe1.stub.c:1:453: warning: ‘double4’ is deprecated: use double4_16a or double4_32a [-Wdeprecated-declarations]
     1 | #pragma GCC diagnostic push
       |                                                                                                                                                                                                                                                                                                                                                                                                                                                                     ^
 /usr/local/cuda-13.2/targets/x86_64-linux/include/vector_types.h:477:42: note: declared here
   477 | __device_builtin__ __builtin_align__(16) double4
       |                                          ^~~~~~~
-/tmp/tmpxft_000d7dad_00000000-6_main.cudafe1.stub.c:1:453: warning: ‘double4’ is deprecated: use double4_16a or double4_32a [-Wdeprecated-declarations]
+/tmp/tmpxft_00198c67_00000000-6_main.cudafe1.stub.c:1:453: warning: ‘double4’ is deprecated: use double4_16a or double4_32a [-Wdeprecated-declarations]
     1 | #pragma GCC diagnostic push
       |                                                                                                                                                                                                                                                                                                                                                                                                                                                                     ^
 /usr/local/cuda-13.2/targets/x86_64-linux/include/vector_types.h:477:42: note: declared here
   477 | __device_builtin__ __builtin_align__(16) double4
       |                                          ^~~~~~~
-/tmp/tmpxft_000d7dad_00000000-6_main.cudafe1.stub.c:1:453: warning: ‘double4’ is deprecated: use double4_16a or double4_32a [-Wdeprecated-declarations]
+/tmp/tmpxft_00198c67_00000000-6_main.cudafe1.stub.c:1:453: warning: ‘double4’ is deprecated: use double4_16a or double4_32a [-Wdeprecated-declarations]
     1 | #pragma GCC diagnostic push
       |                                                                                                                                                                                                                                                                                                                                                                                                                                                                     ^
 /usr/local/cuda-13.2/targets/x86_64-linux/include/vector_types.h:477:42: note: declared here
   477 | __device_builtin__ __builtin_align__(16) double4
       |                                          ^~~~~~~
-/tmp/tmpxft_000d7dad_00000000-6_main.cudafe1.stub.c:1:453: warning: ‘double4’ is deprecated: use double4_16a or double4_32a [-Wdeprecated-declarations]
+/tmp/tmpxft_00198c67_00000000-6_main.cudafe1.stub.c:1:453: warning: ‘double4’ is deprecated: use double4_16a or double4_32a [-Wdeprecated-declarations]
     1 | #pragma GCC diagnostic push
       |                                                                                                                                                                                                                                                                                                                                                                                                                                                                     ^
 /usr/local/cuda-13.2/targets/x86_64-linux/include/vector_types.h:477:42: note: declared here

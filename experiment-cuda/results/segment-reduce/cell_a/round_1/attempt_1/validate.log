@@ -1,0 +1,19 @@
+=== validate.sh | segment-reduce/cell_a/round_1/attempt_1 ===
+=== 2026-06-07T18:01:46+08:00 ===
+
+--- $ main 1 1 ---
+num_elements = 16384
+num_segments = 1024 segment_size = 16 Throughput = 0.016055 (G/s)
+num_segments = 512 segment_size = 32 Throughput = 0.439085 (G/s)
+num_segments = 256 segment_size = 64 Throughput = 0.405384 (G/s)
+num_segments = 128 segment_size = 128 Throughput = 0.519155 (G/s)
+num_segments = 64 segment_size = 256 Throughput = 0.467100 (G/s)
+num_segments = 32 segment_size = 512 Throughput = 0.535968 (G/s)
+num_segments = 16 segment_size = 1024 Throughput = 0.526834 (G/s)
+num_segments = 8 segment_size = 2048 Throughput = 0.555654 (G/s)
+num_segments = 4 segment_size = 4096 Throughput = 0.556654 (G/s)
+num_segments = 2 segment_size = 8192 Throughput = 0.557487 (G/s)
+num_segments = 1 segment_size = 16384 Throughput = 0.569898 (G/s)
+
+
+VALIDATION: PASS

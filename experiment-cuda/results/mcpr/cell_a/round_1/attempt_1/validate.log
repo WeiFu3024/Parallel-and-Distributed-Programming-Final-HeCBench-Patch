@@ -1,0 +1,13 @@
+=== validate.sh | mcpr/cell_a/round_1/attempt_1 ===
+=== 2026-06-07T17:51:07+08:00 ===
+
+--- $ main /home/WillFu/parallel/final/HeCBench/src/mcpr-cuda/alphas.csv 1 ---
+Average execution time of compute_probs kernel: 0.136287 (s)
+PASS
+Average execution time of compute_probs_unitStrides kernel: 0.092251 (s)
+PASS
+Average execution time of compute_probs_unitStrides_sharedMem kernel: 0.084306 (s)
+PASS
+
+
+VALIDATION: PASS

@@ -1,0 +1,19 @@
+=== compile.sh | sc/cell_c/round_2/attempt_1 ===
+=== arch: sm_86 | 2026-06-07T17:20:42+08:00 ===
+=== nvcc: release 13.2 ===
+
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/sc/cell_c/round_2/attempt_1/main.cu:304: warning: ignoring ‘#pragma unroll ’ [-Wunknown-pragmas]
+  304 |                 for(int j = 0; j < REGS_CPU; j++) {
+      | 
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/sc/cell_c/round_2/attempt_1/main.cu:324: warning: ignoring ‘#pragma unroll ’ [-Wunknown-pragmas]
+  324 |                 for(int j = 0; j < REGS_CPU; j++) {
+      | 
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/sc/cell_c/round_2/attempt_1/main.cu: In function ‘int main(int, char**)’:
+/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/sc/cell_c/round_2/attempt_1/main.cu:503:7: warning: ‘void* memset(void*, int, size_t)’ clearing an object of type ‘std::atomic_int’ {aka ‘struct std::atomic<int>’} with no trivial copy-assignment; use value-initialization instead [-Wclass-memaccess]
+  503 |         memset(h_flags, 0, n_flags * sizeof(std::atomic_int));
+      |       ^ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/usr/include/c++/13/atomic:822:19: note: ‘std::atomic_int’ {aka ‘struct std::atomic<int>’} declared here
+  822 |     struct atomic<int> : __atomic_base<int>
+      |                   ^~~~~~~~~~~~
+
+COMPILE: SUCCESS

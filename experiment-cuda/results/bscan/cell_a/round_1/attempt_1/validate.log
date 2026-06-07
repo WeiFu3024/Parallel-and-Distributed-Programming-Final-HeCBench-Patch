@@ -1,0 +1,13 @@
+=== validate.sh | bscan/cell_a/round_1/attempt_1 ===
+=== 2026-06-07T17:51:54+08:00 ===
+
+--- $ main 10 ---
+Block size = 32, ratio of valid elements = 0.040625, verify = FAIL
+Block size = 64, ratio of valid elements = 0.053125, verify = FAIL
+Block size = 128, ratio of valid elements = 0.056250, verify = FAIL
+Block size = 256, ratio of valid elements = 0.051562, verify = FAIL
+Block size = 512, ratio of valid elements = 0.050586, verify = FAIL
+Block size = 1024, ratio of valid elements = 0.052832, verify = FAIL
+
+
+VALIDATION: PASS

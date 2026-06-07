@@ -1,0 +1,10 @@
+=== validate.sh | d2q9-bgk/cell_a/round_1/attempt_1 ===
+=== 2026-06-07T18:05:26+08:00 ===
+
+--- $ main /home/WillFu/parallel/final/HeCBench/src/d2q9-bgk-cuda/Inputs/input_256x256.params /home/WillFu/parallel/final/HeCBench/src/d2q9-bgk-cuda/Obstacles/obstacles_256x256.dat ---
+After warmup for 1000 iterations, average kernel execution time over 79000 iterations:			6.062367 (us)
+==done==
+Reynolds number:		1.006542682648E+01
+
+
+VALIDATION: PASS

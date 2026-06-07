@@ -1,5 +1,5 @@
 === compile.sh | maxpool3d/baseline ===
-=== arch: sm_86 | 2026-06-06T17:07:42+08:00 ===
+=== arch: sm_86 | 2026-06-07T17:15:20+08:00 ===
 === nvcc: release 13.2 ===
 
 

@@ -1,0 +1,71 @@
+<Nsight_Profile>
+
+<Kernel_Profile>
+
+  <Kernel rank="1">
+    <Execution>
+      <Kernel_Name>Kernel(const Node *, const int *, char *, char *, const char *, int *, int)</Kernel_Name>
+      <Kernel_Time_ms>0.0100</Kernel_Time_ms>
+      <Grid_Size>3907</Grid_Size>
+      <Block_Size>256</Block_Size>
+    </Execution>
+    <Occupancy>
+      <Achieved>54.09%</Achieved>
+      <Theoretical_Max>100%</Theoretical_Max>
+      <Limiting_Factor>block_size</Limiting_Factor>
+    </Occupancy>
+    <Memory>
+      <Global_Load_Throughput>109.27 GB/s</Global_Load_Throughput>
+      <Global_Store_Throughput>0.00 GB/s</Global_Store_Throughput>
+      <Shared_Memory_Throughput>0.00 GB/s</Shared_Memory_Throughput>
+      <L1_Hit_Rate>4.36%</L1_Hit_Rate>
+      <L2_Hit_Rate>11.28%</L2_Hit_Rate>
+      <DRAM_Utilization>15.05%</DRAM_Utilization>
+    </Memory>
+    <Compute>
+      <SM_Utilization>9.37%</SM_Utilization>
+      <FP32_Utilization>N/A%</FP32_Utilization>
+      <Warp_Execution_Efficiency>N/A</Warp_Execution_Efficiency>
+    </Compute>
+    <Stall_Analysis>
+      <Top_Stalls>
+        <Stall reason="unknown" percentage="N/A"/>
+      </Top_Stalls>
+    </Stall_Analysis>
+  </Kernel>
+
+  <Kernel rank="2">
+    <Execution>
+      <Kernel_Name>Kernel2(char *, char *, char *, char *, int)</Kernel_Name>
+      <Kernel_Time_ms>0.0063</Kernel_Time_ms>
+      <Grid_Size>3907</Grid_Size>
+      <Block_Size>256</Block_Size>
+    </Execution>
+    <Occupancy>
+      <Achieved>71.99%</Achieved>
+      <Theoretical_Max>100%</Theoretical_Max>
+      <Limiting_Factor>block_size</Limiting_Factor>
+    </Occupancy>
+    <Memory>
+      <Global_Load_Throughput>158.93 GB/s</Global_Load_Throughput>
+      <Global_Store_Throughput>0.00 GB/s</Global_Store_Throughput>
+      <Shared_Memory_Throughput>0.00 GB/s</Shared_Memory_Throughput>
+      <L1_Hit_Rate>0%</L1_Hit_Rate>
+      <L2_Hit_Rate>10.07%</L2_Hit_Rate>
+      <DRAM_Utilization>22.03%</DRAM_Utilization>
+    </Memory>
+    <Compute>
+      <SM_Utilization>13.28%</SM_Utilization>
+      <FP32_Utilization>N/A%</FP32_Utilization>
+      <Warp_Execution_Efficiency>N/A</Warp_Execution_Efficiency>
+    </Compute>
+    <Stall_Analysis>
+      <Top_Stalls>
+        <Stall reason="unknown" percentage="N/A"/>
+      </Top_Stalls>
+    </Stall_Analysis>
+  </Kernel>
+
+</Kernel_Profile>
+
+</Nsight_Profile>

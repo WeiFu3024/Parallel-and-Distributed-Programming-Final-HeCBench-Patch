@@ -1,0 +1,11 @@
+=== validate.sh | nw/cell_a/round_1/attempt_1 ===
+=== 2026-06-07T17:51:47+08:00 ===
+
+--- $ main 16384 10 1 ---
+WG size of kernel = 16 
+block width = 1024
+Total kernel execution time: 0.017393 (s)
+PASS
+
+
+VALIDATION: PASS

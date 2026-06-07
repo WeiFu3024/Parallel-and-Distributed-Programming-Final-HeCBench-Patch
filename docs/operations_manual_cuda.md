@@ -82,11 +82,14 @@ nvcc --version
 ncu --set full --csv \
     --log-file experiment-cuda/results/{benchmark}/baseline/nsight_raw.csv \
     experiment-cuda/results/{benchmark}/baseline/main [arguments]
+# ⚠️  nsight_raw.csv 因體積可能超過 100 MB，已加入 .gitignore，不會被 commit。
+#     每台機器需自行執行上方指令重新產生。
 
 # 4. 轉成 XML（所有 kernel 依執行時間排序）
 python experiment-cuda/scripts/profile_to_xml.py single \
     --input  experiment-cuda/results/{benchmark}/baseline/nsight_raw.csv \
     --output experiment-cuda/results/{benchmark}/baseline/nsight.xml
+# nsight.xml 是精簡摘要，體積小，正常 commit。
 ```
 
 各 benchmark 的標準引數：
@@ -300,7 +303,7 @@ Do not include explanatory text outside of code comments.
 
 <Constraints>
   - Do NOT search the internet or reference external documentation.
-  - Do NOT use acceleration libraries (cuBLAS, cuFFT, cuDNN, Thrust).
+  - Do NOT add new uses of acceleration libraries (cuBLAS, cuFFT, cuDNN, Thrust) that are not already present in the baseline code.
   - Do NOT modify host-side validation logic or input data generation.
   - Do NOT change data types or problem sizes from the original code.
   - You do NOT have access to a compiler, profiler, or runtime environment.
@@ -313,10 +316,14 @@ Do not include explanatory text outside of code comments.
 ```
 Optimize the following CUDA code for maximum GPU performance.
 
+[⚠ 如果此 benchmark 有 per-benchmark note（見文末附錄），在此插入]
+
 <Source_Code>
 [在此貼上 baseline/main.cu 的完整內容]
 </Source_Code>
 ```
+
+> **查詢 per-benchmark note：** 文末「附錄：Per-Benchmark Prompt Notes」列出了需要特殊說明的 benchmark（目前只有 `blas-gemm`）。若當前 benchmark 不在表中，略去即可。
 
 ### LLM 回覆後：
 
@@ -368,6 +375,8 @@ Use the following hardware and algorithmic context to guide your optimization.
 
 Optimize the following CUDA code for maximum GPU performance.
 
+[⚠ 如果此 benchmark 有 per-benchmark note，在此插入（見文末附錄）]
+
 <Source_Code>
 [在此貼上 baseline/main.cu 的完整內容]
 </Source_Code>
@@ -396,6 +405,8 @@ Use the following hardware and algorithmic context to guide your optimization.
 [在此貼上 cell_c/context.xml 的完整內容]
 
 Optimize the following CUDA code for maximum GPU performance.
+
+[⚠ 如果此 benchmark 有 per-benchmark note，在此插入（見文末附錄）]
 
 <Source_Code>
 [在此貼上 baseline/main.cu 的完整內容]
@@ -590,6 +601,39 @@ round_1/
 □ Step 4: Cell C round 3 feedback 已生成、已執行
 □ Step 5: 三個 Cell 的結果已填入結果表
 □ Step 6: context 正確性已事後標記（optional）
+```
+
+---
+
+## 附錄：Per-Benchmark Prompt Notes
+
+某些 benchmark 的原始碼結構會與 system prompt 的通用約束產生歧義，需要在 user prompt 中額外插入說明，消除 LLM 的誤解。
+
+在 Cell A / B / C 的 user prompt 裡，將以下 note 插入在 `<Source_Code>` 區塊之前（緊接在 per-benchmark note 提示行的位置）。
+
+---
+
+### `blas-gemm`
+
+**背景說明（供操作者理解，通常不需要額外插入 note）：**
+
+`blas-gemm/main.cu` 的 host 端用 cuBLAS 做正確性驗證（reference oracle）。
+由於 system prompt 的約束已更新為「不得**新增**加速庫用法」，保留 baseline 中既有的 cuBLAS 呼叫是允許的，LLM 應能正確理解。
+
+若實際跑實驗時 LLM 仍誤刪 cuBLAS reference（導致 PASS/FAIL 輸出消失），可選擇在 user prompt 中插入以下補充說明：
+
+```
+<Benchmark_Note>
+This file contains two distinct parts:
+
+1. OPTIMIZATION TARGET — the `matrix_mul` device kernel (lines ~15-25).
+   This is the ONLY function you should optimize.
+
+2. HOST-SIDE REFERENCE — the `cublasXgemm` calls in `run_gemm_example`.
+   These are a pre-existing correctness oracle. Do NOT remove, replace, or
+   modify any cuBLAS call or the memcmp check. Keeping them is consistent
+   with the constraint; they were already in the baseline.
+</Benchmark_Note>
 ```
 
 ---

@@ -1,0 +1,103 @@
+<Nsight_Profile>
+
+<Kernel_Profile>
+
+  <Kernel rank="1">
+    <Execution>
+      <Kernel_Name>compute_probs(const double *, const double *, double *, int, int, int)</Kernel_Name>
+      <Kernel_Time_ms>137.1747</Kernel_Time_ms>
+      <Grid_Size>137</Grid_Size>
+      <Block_Size>192</Block_Size>
+    </Execution>
+    <Occupancy>
+      <Achieved>20.49%</Achieved>
+      <Theoretical_Max>100%</Theoretical_Max>
+      <Limiting_Factor>block_size</Limiting_Factor>
+    </Occupancy>
+    <Memory>
+      <Global_Load_Throughput>619.87 GB/s</Global_Load_Throughput>
+      <Global_Store_Throughput>0.00 GB/s</Global_Store_Throughput>
+      <Shared_Memory_Throughput>0.00 GB/s</Shared_Memory_Throughput>
+      <L1_Hit_Rate>68.66%</L1_Hit_Rate>
+      <L2_Hit_Rate>66.31%</L2_Hit_Rate>
+      <DRAM_Utilization>85.03%</DRAM_Utilization>
+    </Memory>
+    <Compute>
+      <SM_Utilization>27.25%</SM_Utilization>
+      <FP32_Utilization>N/A%</FP32_Utilization>
+      <Warp_Execution_Efficiency>N/A</Warp_Execution_Efficiency>
+    </Compute>
+    <Stall_Analysis>
+      <Top_Stalls>
+        <Stall reason="unknown" percentage="N/A"/>
+      </Top_Stalls>
+    </Stall_Analysis>
+  </Kernel>
+
+  <Kernel rank="2">
+    <Execution>
+      <Kernel_Name>compute_probs_unitStrides(const double *, const double *, double *, int, int, int)</Kernel_Name>
+      <Kernel_Time_ms>84.7097</Kernel_Time_ms>
+      <Grid_Size>137</Grid_Size>
+      <Block_Size>192</Block_Size>
+    </Execution>
+    <Occupancy>
+      <Achieved>20.15%</Achieved>
+      <Theoretical_Max>100%</Theoretical_Max>
+      <Limiting_Factor>block_size</Limiting_Factor>
+    </Occupancy>
+    <Memory>
+      <Global_Load_Throughput>563.93 GB/s</Global_Load_Throughput>
+      <Global_Store_Throughput>0.00 GB/s</Global_Store_Throughput>
+      <Shared_Memory_Throughput>0.00 GB/s</Shared_Memory_Throughput>
+      <L1_Hit_Rate>63.12%</L1_Hit_Rate>
+      <L2_Hit_Rate>78.29%</L2_Hit_Rate>
+      <DRAM_Utilization>77.36%</DRAM_Utilization>
+    </Memory>
+    <Compute>
+      <SM_Utilization>45.20%</SM_Utilization>
+      <FP32_Utilization>N/A%</FP32_Utilization>
+      <Warp_Execution_Efficiency>N/A</Warp_Execution_Efficiency>
+    </Compute>
+    <Stall_Analysis>
+      <Top_Stalls>
+        <Stall reason="unknown" percentage="N/A"/>
+      </Top_Stalls>
+    </Stall_Analysis>
+  </Kernel>
+
+  <Kernel rank="3">
+    <Execution>
+      <Kernel_Name>compute_probs_unitStrides_sharedMem(const double *, const double *, double *, int, int, int)</Kernel_Name>
+      <Kernel_Time_ms>84.2194</Kernel_Time_ms>
+      <Grid_Size>274</Grid_Size>
+      <Block_Size>96</Block_Size>
+    </Execution>
+    <Occupancy>
+      <Achieved>17.48%</Achieved>
+      <Theoretical_Max>18.75%</Theoretical_Max>
+      <Limiting_Factor>block_size</Limiting_Factor>
+    </Occupancy>
+    <Memory>
+      <Global_Load_Throughput>0.36 GB/s</Global_Load_Throughput>
+      <Global_Store_Throughput>0.00 GB/s</Global_Store_Throughput>
+      <Shared_Memory_Throughput>0.00 GB/s</Shared_Memory_Throughput>
+      <L1_Hit_Rate>14.23%</L1_Hit_Rate>
+      <L2_Hit_Rate>99.89%</L2_Hit_Rate>
+      <DRAM_Utilization>0.05%</DRAM_Utilization>
+    </Memory>
+    <Compute>
+      <SM_Utilization>43.39%</SM_Utilization>
+      <FP32_Utilization>N/A%</FP32_Utilization>
+      <Warp_Execution_Efficiency>N/A</Warp_Execution_Efficiency>
+    </Compute>
+    <Stall_Analysis>
+      <Top_Stalls>
+        <Stall reason="unknown" percentage="N/A"/>
+      </Top_Stalls>
+    </Stall_Analysis>
+  </Kernel>
+
+</Kernel_Profile>
+
+</Nsight_Profile>

@@ -1,0 +1,13 @@
+=== validate.sh | maxpool3d/cell_a/round_1/attempt_1 ===
+=== 2026-06-07T17:50:36+08:00 ===
+
+--- $ main 2048 2048 96 1 ---
+input image width 2048 Hstride 2
+input image height 2048 Vstride 2
+output image width 1024
+output image height 1024
+Average kernel execution time: 0.003007 (s)
+PASS
+
+
+VALIDATION: PASS

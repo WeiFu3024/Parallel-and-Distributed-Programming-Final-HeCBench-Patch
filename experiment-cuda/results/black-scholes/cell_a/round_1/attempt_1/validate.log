@@ -1,0 +1,21 @@
+=== validate.sh | black-scholes/cell_a/round_1/attempt_1 ===
+=== 2026-06-07T18:05:20+08:00 ===
+
+--- $ main 1 ---
+Number of options: 50000000
+
+Run on GPU
+Average kernel execution time on GPU: 4.243000 (ms)
+Processing time on GPU: 653.466980 (ms)
+Summation of output prices on GPU: 268435456.000000
+Output price at index 25000000 on GPU: 10.847914
+
+Run on CPU
+Processing time on CPU: 3580.072021 (ms)
+Summation of output prices on CPU: 268435456.000000
+Output price at index 25000000 on CPU: 10.847917
+
+Speedup on GPU: 5.478581
+
+
+VALIDATION: PASS

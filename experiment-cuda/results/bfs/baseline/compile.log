@@ -1,5 +1,5 @@
 === compile.sh | bfs/baseline ===
-=== arch: sm_86 | 2026-06-06T17:06:47+08:00 ===
+=== arch: sm_86 | 2026-06-07T17:15:50+08:00 ===
 === nvcc: release 13.2 ===
 
 /home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/bfs/baseline/main.cu(204): warning #1650-D: result of call is not used

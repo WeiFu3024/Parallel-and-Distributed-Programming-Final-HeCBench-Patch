@@ -1,0 +1,11 @@
+=== validate.sh | page-rank/cell_a/round_1/attempt_1 ===
+=== 2026-06-07T17:51:32+08:00 ===
+
+--- $ main -n 20000 -i 10 ---
+Max difference 0.000001 is reached at iteration 11
+Threshold: 0.000000
+"Options": "-n 20000 -i 10 -t 0.000000". Total kernel execution time: 0.151210 (s)
+PASS
+
+
+VALIDATION: PASS

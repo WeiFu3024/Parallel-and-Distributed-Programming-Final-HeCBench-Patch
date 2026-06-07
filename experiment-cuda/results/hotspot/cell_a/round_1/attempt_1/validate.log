@@ -1,0 +1,10 @@
+=== validate.sh | hotspot/cell_a/round_1/attempt_1 ===
+=== 2026-06-07T17:51:27+08:00 ===
+
+--- $ main 512 2 200 /home/WillFu/parallel/final/HeCBench/src/data/hotspot/temp_512 /home/WillFu/parallel/final/HeCBench/src/data/hotspot/power_512 /tmp/hotspot_output.out ---
+Work-group size of kernel = 16 X 16
+Total kernel execution time 0.000906 (s)
+Device offloading time: 0.200 seconds
+
+
+VALIDATION: PASS

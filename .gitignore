@@ -1,0 +1,10 @@
+# Python
+__pycache__/
+*.py[cod]
+
+# Compiled CUDA binaries
+experiment-cuda/results/**/main
+experiment-omp/results/**/main
+
+# Nsight Compute raw profiling output (can be large; regenerate with ncu)
+**/nsight_raw.csv

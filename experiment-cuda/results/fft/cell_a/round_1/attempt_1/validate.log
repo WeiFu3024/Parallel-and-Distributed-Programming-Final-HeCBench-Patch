@@ -1,0 +1,11 @@
+=== validate.sh | fft/cell_a/round_1/attempt_1 ===
+=== 2026-06-07T17:51:03+08:00 ===
+
+--- $ main 3 10 ---
+used_bytes=268435456, n_cmplx=16777216
+FFT PASS
+iFFT PASS
+Average kernel execution time 0.0123274 (s)
+
+
+VALIDATION: PASS

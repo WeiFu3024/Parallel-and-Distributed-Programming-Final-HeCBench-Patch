@@ -1,0 +1,14 @@
+=== validate.sh | mis/cell_a/round_1/attempt_1 ===
+=== 2026-06-07T18:01:46+08:00 ===
+
+--- $ main /home/WillFu/parallel/final/HeCBench/src/mis-cuda/internet.egr 1 ---
+ECL-MIS v1.3 (/home/WillFu/parallel/final/HeCBench/experiment-cuda/scripts/../results/mis/baseline/main.cu)
+Copyright 2017-2020 Texas State University
+configuration: 124651 nodes and 387240 edges (/home/WillFu/parallel/final/HeCBench/src/mis-cuda/internet.egr)
+average degree: 3.11 edges per node
+compute time: 0.000291 s
+throughput: 427.857010 Mnodes/s
+throughput: 1329.177854 Medges/s
+
+
+VALIDATION: PASS

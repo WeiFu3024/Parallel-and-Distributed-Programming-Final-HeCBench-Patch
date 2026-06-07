@@ -1,0 +1,167 @@
+<Nsight_Profile>
+
+<Kernel_Profile>
+
+  <Kernel rank="1">
+    <Execution>
+      <Kernel_Name>void decompressKernel<unsigned int>(T1 *, unsigned int, const unsigned int *, const unsigned int *, const unsigned char *, const unsigned char *)</Kernel_Name>
+      <Kernel_Time_ms>0.4113</Kernel_Time_ms>
+      <Grid_Size>2</Grid_Size>
+      <Block_Size>32</Block_Size>
+    </Execution>
+    <Occupancy>
+      <Achieved>2.08%</Achieved>
+      <Theoretical_Max>33.33%</Theoretical_Max>
+      <Limiting_Factor>block_size</Limiting_Factor>
+    </Occupancy>
+    <Memory>
+      <Global_Load_Throughput>0.24 GB/s</Global_Load_Throughput>
+      <Global_Store_Throughput>0.00 GB/s</Global_Store_Throughput>
+      <Shared_Memory_Throughput>0.00 GB/s</Shared_Memory_Throughput>
+      <L1_Hit_Rate>89.95%</L1_Hit_Rate>
+      <L2_Hit_Rate>91.13%</L2_Hit_Rate>
+      <DRAM_Utilization>0.03%</DRAM_Utilization>
+    </Memory>
+    <Compute>
+      <SM_Utilization>0.07%</SM_Utilization>
+      <FP32_Utilization>N/A%</FP32_Utilization>
+      <Warp_Execution_Efficiency>N/A</Warp_Execution_Efficiency>
+    </Compute>
+    <Stall_Analysis>
+      <Top_Stalls>
+        <Stall reason="unknown" percentage="N/A"/>
+      </Top_Stalls>
+    </Stall_Analysis>
+  </Kernel>
+
+  <Kernel rank="2">
+    <Execution>
+      <Kernel_Name>void compressKernelI<unsigned int>(const T1 *, unsigned int, unsigned int *, unsigned int *, unsigned char *, unsigned char *, int)</Kernel_Name>
+      <Kernel_Time_ms>0.0323</Kernel_Time_ms>
+      <Grid_Size>49</Grid_Size>
+      <Block_Size>128</Block_Size>
+    </Execution>
+    <Occupancy>
+      <Achieved>8.26%</Achieved>
+      <Theoretical_Max>100%</Theoretical_Max>
+      <Limiting_Factor>block_size</Limiting_Factor>
+    </Occupancy>
+    <Memory>
+      <Global_Load_Throughput>3.85 GB/s</Global_Load_Throughput>
+      <Global_Store_Throughput>0.00 GB/s</Global_Store_Throughput>
+      <Shared_Memory_Throughput>0.00 GB/s</Shared_Memory_Throughput>
+      <L1_Hit_Rate>70.08%</L1_Hit_Rate>
+      <L2_Hit_Rate>77.85%</L2_Hit_Rate>
+      <DRAM_Utilization>0.53%</DRAM_Utilization>
+    </Memory>
+    <Compute>
+      <SM_Utilization>8.01%</SM_Utilization>
+      <FP32_Utilization>N/A%</FP32_Utilization>
+      <Warp_Execution_Efficiency>N/A</Warp_Execution_Efficiency>
+    </Compute>
+    <Stall_Analysis>
+      <Top_Stalls>
+        <Stall reason="unknown" percentage="N/A"/>
+      </Top_Stalls>
+    </Stall_Analysis>
+  </Kernel>
+
+  <Kernel rank="3">
+    <Execution>
+      <Kernel_Name>void compressKernelIII<unsigned int>(unsigned int, const unsigned int *, const unsigned int *, const unsigned char *, const unsigned char *, unsigned char *, unsigned char *)</Kernel_Name>
+      <Kernel_Time_ms>0.0046</Kernel_Time_ms>
+      <Grid_Size>49</Grid_Size>
+      <Block_Size>128</Block_Size>
+    </Execution>
+    <Occupancy>
+      <Achieved>7.48%</Achieved>
+      <Theoretical_Max>100%</Theoretical_Max>
+      <Limiting_Factor>block_size</Limiting_Factor>
+    </Occupancy>
+    <Memory>
+      <Global_Load_Throughput>19.23 GB/s</Global_Load_Throughput>
+      <Global_Store_Throughput>0.00 GB/s</Global_Store_Throughput>
+      <Shared_Memory_Throughput>0.00 GB/s</Shared_Memory_Throughput>
+      <L1_Hit_Rate>59.35%</L1_Hit_Rate>
+      <L2_Hit_Rate>64.03%</L2_Hit_Rate>
+      <DRAM_Utilization>2.66%</DRAM_Utilization>
+    </Memory>
+    <Compute>
+      <SM_Utilization>1.40%</SM_Utilization>
+      <FP32_Utilization>N/A%</FP32_Utilization>
+      <Warp_Execution_Efficiency>N/A</Warp_Execution_Efficiency>
+    </Compute>
+    <Stall_Analysis>
+      <Top_Stalls>
+        <Stall reason="unknown" percentage="N/A"/>
+      </Top_Stalls>
+    </Stall_Analysis>
+  </Kernel>
+
+  <Kernel rank="4">
+    <Execution>
+      <Kernel_Name>void cub::DeviceScanKernel<cub::policy_hub<unsigned int, unsigned int, unsigned int, unsigned int, cuda::plus<void>>::Policy1000, unsigned int *, unsigned int *, cub::ScanTileState<unsigned int, 1>, cuda::plus<void>, cub::InputValue<unsigned int, unsigned int *>, unsigned int, unsigned int, 0, unsigned int>(T2, T3, T4, int, T5, T6, T7)</Kernel_Name>
+      <Kernel_Time_ms>0.0031</Kernel_Time_ms>
+      <Grid_Size>1</Grid_Size>
+      <Block_Size>128</Block_Size>
+    </Execution>
+    <Occupancy>
+      <Achieved>8.64%</Achieved>
+      <Theoretical_Max>83.33%</Theoretical_Max>
+      <Limiting_Factor>block_size</Limiting_Factor>
+    </Occupancy>
+    <Memory>
+      <Global_Load_Throughput>6.14 GB/s</Global_Load_Throughput>
+      <Global_Store_Throughput>0.00 GB/s</Global_Store_Throughput>
+      <Shared_Memory_Throughput>0.00 GB/s</Shared_Memory_Throughput>
+      <L1_Hit_Rate>22.22%</L1_Hit_Rate>
+      <L2_Hit_Rate>70.90%</L2_Hit_Rate>
+      <DRAM_Utilization>0.85%</DRAM_Utilization>
+    </Memory>
+    <Compute>
+      <SM_Utilization>0.18%</SM_Utilization>
+      <FP32_Utilization>N/A%</FP32_Utilization>
+      <Warp_Execution_Efficiency>N/A</Warp_Execution_Efficiency>
+    </Compute>
+    <Stall_Analysis>
+      <Top_Stalls>
+        <Stall reason="unknown" percentage="N/A"/>
+      </Top_Stalls>
+    </Stall_Analysis>
+  </Kernel>
+
+  <Kernel rank="5">
+    <Execution>
+      <Kernel_Name>void cub::DeviceScanInitKernel<cub::ScanTileState<unsigned int, 1>>(T1, int)</Kernel_Name>
+      <Kernel_Time_ms>0.0019</Kernel_Time_ms>
+      <Grid_Size>1</Grid_Size>
+      <Block_Size>128</Block_Size>
+    </Execution>
+    <Occupancy>
+      <Achieved>8.44%</Achieved>
+      <Theoretical_Max>100%</Theoretical_Max>
+      <Limiting_Factor>block_size</Limiting_Factor>
+    </Occupancy>
+    <Memory>
+      <Global_Load_Throughput>1.52 GB/s</Global_Load_Throughput>
+      <Global_Store_Throughput>0.00 GB/s</Global_Store_Throughput>
+      <Shared_Memory_Throughput>0.00 GB/s</Shared_Memory_Throughput>
+      <L1_Hit_Rate>0%</L1_Hit_Rate>
+      <L2_Hit_Rate>91.94%</L2_Hit_Rate>
+      <DRAM_Utilization>0.21%</DRAM_Utilization>
+    </Memory>
+    <Compute>
+      <SM_Utilization>0.01%</SM_Utilization>
+      <FP32_Utilization>N/A%</FP32_Utilization>
+      <Warp_Execution_Efficiency>N/A</Warp_Execution_Efficiency>
+    </Compute>
+    <Stall_Analysis>
+      <Top_Stalls>
+        <Stall reason="unknown" percentage="N/A"/>
+      </Top_Stalls>
+    </Stall_Analysis>
+  </Kernel>
+
+</Kernel_Profile>
+
+</Nsight_Profile>

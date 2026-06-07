@@ -1,0 +1,16 @@
+=== validate.sh | blas-gemm/cell_a/round_1/attempt_1 ===
+=== 2026-06-07T17:49:21+08:00 ===
+
+--- $ main 4096 4096 4096 1 ---
+	Running with half precision data type:
+Checking BLAS GEMM.. PASS
+Average GEMM execution time: 1145.75 (us), 119.97 TFLOP/s
+	Running with single precision data type:
+Checking BLAS GEMM.. PASS
+Average GEMM execution time: 5312.35 (us), 25.8747 TFLOP/s
+	Running with double precision data type:
+Checking BLAS GEMM.. PASS
+Average GEMM execution time: 249423 (us), 551.094 GFLOP/s
+
+
+VALIDATION: PASS

@@ -1,6 +1,0 @@
-=== compile.sh | accuracy/cell_a/round_1/attempt_1 ===
-=== arch: sm_86 | 2026-06-05T02:25:37+08:00 ===
-=== nvcc: release 13.2 ===
-
-
-COMPILE: SUCCESS

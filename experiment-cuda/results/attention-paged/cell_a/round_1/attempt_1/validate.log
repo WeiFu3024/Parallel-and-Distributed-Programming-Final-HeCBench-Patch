@@ -1,0 +1,25 @@
+=== validate.sh | attention-paged/cell_a/round_1/attempt_1 ===
+=== 2026-06-07T17:49:20+08:00 ===
+
+--- $ main 8 32 128 4096 128 1 ---
+query shape = [8 (num_seqs), 32 (num_query_heads), 128 (head_size)]
+Number of kv heads = 32
+Number of kv cache blocks = 128
+max_seq_len = 4096
+
+-------------------
+FP32 PageAttention v1
+--------------------
+kv cache block size = 16
+Average execution time of the kernel: 664.216003 (us)
+PASS
+
+-------------------
+BF16 PageAttention v1
+--------------------
+kv cache block size = 32
+Average execution time of the kernel: 476.529022 (us)
+PASS
+
+
+VALIDATION: PASS

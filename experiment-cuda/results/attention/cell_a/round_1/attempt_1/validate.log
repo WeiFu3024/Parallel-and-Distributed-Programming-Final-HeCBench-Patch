@@ -1,0 +1,9 @@
+=== validate.sh | attention/cell_a/round_1/attempt_1 ===
+=== 2026-06-07T17:49:16+08:00 ===
+
+--- $ main 65536 2048 0 10 ---
+Average execution time of kernels 5.984856 (ms)
+PASS
+
+
+VALIDATION: PASS

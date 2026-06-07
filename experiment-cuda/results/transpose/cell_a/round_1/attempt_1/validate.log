@@ -1,0 +1,19 @@
+=== validate.sh | transpose/cell_a/round_1/attempt_1 ===
+=== 2026-06-07T17:51:57+08:00 ===
+
+--- $ main 16384 16384 1 ---
+
+Matrix size: 16384x16384 (1024x1024 tiles), tile size: 16x16, block size: 16x16
+
+Average kernel (simple copy       ) execution time: 3576.464111 (us)
+Average kernel (shared memory copy) execution time: 3175.096191 (us)
+Average kernel (naive             ) execution time: 4062.490234 (us)
+Average kernel (coalesced         ) execution time: 3569.868164 (us)
+Average kernel (optimized         ) execution time: 3567.119141 (us)
+Average kernel (coarse-grained    ) execution time: 3573.700195 (us)
+Average kernel (fine-grained      ) execution time: 3165.440186 (us)
+Average kernel (diagonal          ) execution time: 4967.213379 (us)
+PASS
+
+
+VALIDATION: PASS

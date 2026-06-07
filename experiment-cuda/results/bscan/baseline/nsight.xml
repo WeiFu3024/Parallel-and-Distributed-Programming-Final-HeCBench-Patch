@@ -1,0 +1,39 @@
+<Nsight_Profile>
+
+<Kernel_Profile>
+
+  <Kernel rank="1">
+    <Execution>
+      <Kernel_Name>binary_scan(int *, const int *)</Kernel_Name>
+      <Kernel_Time_ms>nan</Kernel_Time_ms>
+      <Grid_Size>n/a</Grid_Size>
+      <Block_Size>n/a</Block_Size>
+    </Execution>
+    <Occupancy>
+      <Achieved>nan%</Achieved>
+      <Theoretical_Max>n/a%</Theoretical_Max>
+      <Limiting_Factor>block_size</Limiting_Factor>
+    </Occupancy>
+    <Memory>
+      <Global_Load_Throughput>nan GB/s</Global_Load_Throughput>
+      <Global_Store_Throughput>0.00 GB/s</Global_Store_Throughput>
+      <Shared_Memory_Throughput>0.00 GB/s</Shared_Memory_Throughput>
+      <L1_Hit_Rate>nan%</L1_Hit_Rate>
+      <L2_Hit_Rate>nan%</L2_Hit_Rate>
+      <DRAM_Utilization>nan%</DRAM_Utilization>
+    </Memory>
+    <Compute>
+      <SM_Utilization>nan%</SM_Utilization>
+      <FP32_Utilization>N/A%</FP32_Utilization>
+      <Warp_Execution_Efficiency>N/A</Warp_Execution_Efficiency>
+    </Compute>
+    <Stall_Analysis>
+      <Top_Stalls>
+        <Stall reason="unknown" percentage="N/A"/>
+      </Top_Stalls>
+    </Stall_Analysis>
+  </Kernel>
+
+</Kernel_Profile>
+
+</Nsight_Profile>

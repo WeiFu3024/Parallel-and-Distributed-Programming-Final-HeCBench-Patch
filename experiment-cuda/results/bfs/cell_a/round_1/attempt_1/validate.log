@@ -1,0 +1,12 @@
+=== validate.sh | bfs/cell_a/round_1/attempt_1 ===
+=== 2026-06-07T17:51:30+08:00 ===
+
+--- $ main /home/WillFu/parallel/final/HeCBench/src/data/bfs/graph1MW_6.txt ---
+Reading File
+run bfs (#nodes = 1000000) on device
+Total kernel execution time : 743.845032 (us)
+run bfs (#nodes = 1000000) on host (cpu) 
+Passed
+
+
+VALIDATION: PASS

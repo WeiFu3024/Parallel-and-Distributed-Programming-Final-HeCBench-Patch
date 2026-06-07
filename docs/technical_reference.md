@@ -55,8 +55,9 @@ Cross-variant comparison (CUDA GPU vs CPU OpenMP on the same benchmark) is a sec
 6. **LLM has no shell/tool access.** All compilation, execution, and profiling is
    performed by the human pipeline. The LLM only outputs .cu source code.
 
-7. **No acceleration libraries.** LLM must write raw CUDA kernels (no cuBLAS, cuFFT,
-   cuDNN, Thrust). The project's Baseline 2 already covers library-accelerated versions.
+7. **No new acceleration libraries.** LLM must write raw CUDA kernels. Existing library calls
+   already present in the baseline (e.g. cuBLAS in `blas-gemm`) may be kept; new uses of
+   cuBLAS, cuFFT, cuDNN, or Thrust are not permitted.
 
 ---
 
@@ -234,7 +235,7 @@ Do not include explanatory text outside of code comments.
 
 <Constraints>
   - Do NOT search the internet or reference external documentation.
-  - Do NOT use acceleration libraries (cuBLAS, cuFFT, cuDNN, Thrust).
+  - Do NOT add new uses of acceleration libraries (cuBLAS, cuFFT, cuDNN, Thrust) that are not already present in the baseline code.
   - Do NOT modify host-side validation logic or input data generation.
   - Do NOT change data types or problem sizes from the original code.
   - You do NOT have access to a compiler, profiler, or runtime environment.
@@ -330,7 +331,7 @@ Fill in every field of the template. Output only the completed XML.
 ### 5.1 LLM Sandbox
 - No shell, compiler, profiler, or runtime access.
 - No internet access.
-- No acceleration libraries (cuBLAS, cuFFT, cuDNN, Thrust).
+- No new acceleration libraries (cuBLAS, cuFFT, cuDNN, Thrust) beyond what the baseline already uses.
 - Cannot modify host-side code (validation, input generation, data types, problem sizes).
 - Output: single self-contained .cu file only.
 

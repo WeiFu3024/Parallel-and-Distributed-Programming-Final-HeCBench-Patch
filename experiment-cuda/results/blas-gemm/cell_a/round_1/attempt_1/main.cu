@@ -8,130 +8,27 @@
 #include <cublas_v2.h>
 #include "utils.h"
 
-// Tiled GEMM: C = alpha * A * B + beta * C
-//
-// Template parameters
-//   BM, BN : output tile dimensions per thread-block
-//   BK     : K-dimension strip processed per shared-memory phase
-//   TM, TN : per-thread output tile (register blocking)
-//
-// Thread-block shape: (BN/TN, BM/TM) — always 256 threads for all types.
-//
-// Shared memory layout (with +1 padding column to reduce bank conflicts):
-//   sA[BM][BK+1]  —  A sub-tile
-//   sB[BK][BN+1]  —  B sub-tile
-//
-// Arithmetic intensity per global byte:
-//   baseline : 2 FLOPs / (2 * sizeof(T)) bytes  = O(1)
-//   this kernel: 2*BM*BN*BK FLOPs / shared-reload traffic = O(BK) improvement
-template <typename T, int BM, int BN, int BK, int TM, int TN>
-__global__ void __launch_bounds__((BM / TM) * (BN / TN))
-gemm_tiled(const T* __restrict__ A, const T* __restrict__ B, T* C,
-           int M, int K, int N, T alpha, T beta)
-{
-    constexpr int THREADS_X  = BN / TN;
-    constexpr int THREADS_Y  = BM / TM;
-    constexpr int NUM_THREADS = THREADS_X * THREADS_Y;
+#define TILE_X 16
+#define TILE_Y 16
 
-    const int tx = threadIdx.x;
-    const int ty = threadIdx.y;
-    const int tid = ty * THREADS_X + tx;
-
-    const int row_base = blockIdx.y * BM;
-    const int col_base = blockIdx.x * BN;
-
-    // +1 padding reduces shared-memory bank conflicts on column reads
-    __shared__ T sA[BM][BK + 1];
-    __shared__ T sB[BK][BN + 1];
-
-    // Accumulator lives entirely in registers
-    T acc[TM][TN];
-    #pragma unroll
-    for (int m = 0; m < TM; m++)
-        #pragma unroll
-        for (int n = 0; n < TN; n++)
-            acc[m][n] = T(0);
-
-    // Main K loop: each iteration loads one BM×BK strip of A
-    // and one BK×BN strip of B into shared memory, then accumulates.
-    for (int k_off = 0; k_off < K; k_off += BK) {
-
-        // --- Cooperative load of A tile (BM × BK) ---
-        for (int i = tid; i < BM * BK; i += NUM_THREADS) {
-            int r = i / BK, c = i % BK;
-            int gr = row_base + r, gc = k_off + c;
-            sA[r][c] = (gr < M && gc < K) ? A[gr * K + gc] : T(0);
-        }
-
-        // --- Cooperative load of B tile (BK × BN) ---
-        for (int i = tid; i < BK * BN; i += NUM_THREADS) {
-            int r = i / BN, c = i % BN;
-            int gr = k_off + r, gc = col_base + c;
-            sB[r][c] = (gr < K && gc < N) ? B[gr * N + gc] : T(0);
-        }
-
-        __syncthreads();
-
-        // --- Accumulate TM×TN outer products across BK ---
-        #pragma unroll
-        for (int k = 0; k < BK; k++) {
-            T ra[TM], rb[TN];
-            // Load a column of A into registers (broadcast: all warp threads share ty)
-            #pragma unroll
-            for (int m = 0; m < TM; m++)
-                ra[m] = sA[ty * TM + m][k];
-            // Load a row of B into registers
-            #pragma unroll
-            for (int n = 0; n < TN; n++)
-                rb[n] = sB[k][tx * TN + n];
-            // Outer product accumulation
-            #pragma unroll
-            for (int m = 0; m < TM; m++)
-                #pragma unroll
-                for (int n = 0; n < TN; n++)
-                    acc[m][n] += ra[m] * rb[n];
-        }
-
-        __syncthreads();
-    }
-
-    // --- Write TM×TN results with alpha/beta scaling ---
-    #pragma unroll
-    for (int m = 0; m < TM; m++) {
-        #pragma unroll
-        for (int n = 0; n < TN; n++) {
-            int gr = row_base + ty * TM + m;
-            int gc = col_base + tx * TN + n;
-            if (gr < M && gc < N)
-                C[gr * N + gc] = alpha * acc[m][n] + beta * C[gr * N + gc];
-        }
-    }
+// M * K, K * N
+template <typename T>
+__global__ void matrix_mul(T *a, T *b, T *c, int M, int K, int N, T alpha, T beta) {
+  int row = blockIdx.y * TILE_Y + threadIdx.y;
+  int col = blockIdx.x * TILE_X + threadIdx.x;
+  if (row < M && col < N) {
+    T s = 0;
+    for (int k = 0; k < K; k++)
+      s += a[row * K + k] * b[k * N + col];
+    c[row * N + col] = alpha * s + beta * c[row * N + col];
+  }
 }
 
-// Dispatch gemm_tiled with type-appropriate tile sizes.
-//
-// float  : BM=BN=128, BK=8,  TM=TN=8  → 256 threads, ~8.5 KB shmem
-// double : BM=BN=64,  BK=8,  TM=TN=4  → 256 threads, ~8.6 KB shmem
-// __half : BM=BN=128, BK=16, TM=TN=8  → 256 threads, ~8.3 KB shmem
 template <typename T>
 void run_simple_gemm(T *a, T *b, T *c, int M, int K, int N, T alpha, T beta) {
-    if constexpr (std::is_same_v<T, double>) {
-        constexpr int BM = 64, BN = 64, BK = 8, TM = 4, TN = 4;
-        dim3 threads(BN / TN, BM / TM);
-        dim3 grids((N + BN - 1) / BN, (M + BM - 1) / BM);
-        gemm_tiled<T, BM, BN, BK, TM, TN><<<grids, threads>>>(a, b, c, M, K, N, alpha, beta);
-    } else if constexpr (std::is_same_v<T, float>) {
-        constexpr int BM = 128, BN = 128, BK = 8, TM = 8, TN = 8;
-        dim3 threads(BN / TN, BM / TM);
-        dim3 grids((N + BN - 1) / BN, (M + BM - 1) / BM);
-        gemm_tiled<T, BM, BN, BK, TM, TN><<<grids, threads>>>(a, b, c, M, K, N, alpha, beta);
-    } else {
-        // __half: wider K strip to amortize shared-memory overhead
-        constexpr int BM = 128, BN = 128, BK = 16, TM = 8, TN = 8;
-        dim3 threads(BN / TN, BM / TM);
-        dim3 grids((N + BN - 1) / BN, (M + BM - 1) / BM);
-        gemm_tiled<T, BM, BN, BK, TM, TN><<<grids, threads>>>(a, b, c, M, K, N, alpha, beta);
-    }
+  dim3 grids ((N + TILE_X - 1) / TILE_X, (M + TILE_Y - 1) / TILE_Y);
+  dim3 blocks (TILE_X, TILE_Y);
+  matrix_mul<<<grids, blocks>>>(a, b, c, M, K, N, alpha, beta);
 }
 
 //
@@ -203,12 +100,19 @@ void run_gemm_example(int m, int k, int n, int repeat) {
   int error = memcmp(c, r, C_size);
   std::cout << (error ? "FAIL" : "PASS") << std::endl;
 
-  // Benchmark our tiled kernel (not cuBLAS)
   cudaDeviceSynchronize();
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    run_simple_gemm(da, db, dc, m, k, n, alpha, beta);
+    if constexpr (std::is_same_v<fp, __half>)
+      cublasHgemm(h, CUBLAS_OP_N, CUBLAS_OP_N, n, m, k,
+                  &alpha, db, n, da, k, &beta, dc, n);
+    else if constexpr (std::is_same_v<fp, float>)
+      cublasSgemm(h, CUBLAS_OP_N, CUBLAS_OP_N, n, m, k,
+                  &alpha, db, n, da, k, &beta, dc, n);
+    else if constexpr (std::is_same_v<fp, double>)
+      cublasDgemm(h, CUBLAS_OP_N, CUBLAS_OP_N, n, m, k,
+                  &alpha, db, n, da, k, &beta, dc, n);
   }
 
   cudaDeviceSynchronize();
