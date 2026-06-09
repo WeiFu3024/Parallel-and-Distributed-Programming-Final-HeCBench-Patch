@@ -147,6 +147,49 @@ python experiment-cuda/scripts/profile_to_xml.py single \
 
 ⁵ **lzss**：樣本資料需從外部下載：<https://github.com/hpdps-group/ICS23-GPULZ>。
 
+### Step 0.3b：批次執行 compile / validate / profiling（可選）
+
+若不想逐步手動跑 `compile.sh`、`validate.sh`、`ncu`，可用批次腳本**序列化**處理多個 target。
+腳本會自動跳過沒有 `main.cu` 的目錄；任一階段失敗則不繼續後續步驟。
+
+```bash
+# 全部 baseline
+bash experiment-cuda/scripts/run_pipeline.sh <HeCBench_Path> --target baseline
+
+# 全部 cell_a（所有有 main.cu 的 attempt）
+bash experiment-cuda/scripts/run_pipeline.sh <HeCBench_Path> --target cell_a
+
+# cell_c 只跑 round 2
+bash experiment-cuda/scripts/run_pipeline.sh <HeCBench_Path> --target cell_c --round 2
+
+# 單一 benchmark、全部 target
+bash experiment-cuda/scripts/run_pipeline.sh <HeCBench_Path> --target all --benchmark bfs
+
+# 只看說明
+bash experiment-cuda/scripts/run_pipeline.sh --help
+```
+
+**參數：**
+
+| 參數 | 可選值 | 預設 | 說明 |
+|------|--------|------|------|
+| `--target` | `baseline` / `cell_a` / `cell_b` / `cell_c` / `all` | `all` | 要跑哪種 setting |
+| `--round` | `1` / `2` / `3` / `all` | `all` | 僅 `cell_c` 有效 |
+| `--attempt` | `1` / `2` / `3` / `all` | `all` | 只處理有 `main.cu` 的 attempt |
+| `--benchmark` | 名稱或 `all` | `all` | 限定單一 benchmark |
+| `--sm-arch` | 如 `sm_86` | `auto` | 傳給 `compile.sh` |
+
+**每個 target 的流程：**
+
+| target | 流程 |
+|--------|------|
+| `baseline` | compile → ncu → `nsight.xml`（baseline 無 validate 步驟） |
+| `cell_a` / `cell_b` / `cell_c` | compile → validate → ncu → `nsight.xml` |
+| `cell_c` round R 成功後 | 額外產生 `round_{R+1}/feedback.xml`（需 baseline 的 `nsight_raw.csv` 已存在） |
+
+`ncu` 使用的 benchmark 引數與上方 Step 0.3 表格相同（profiling 規模）。
+也可選擇不用此腳本，照下方各 Cell 步驟手動執行。
+
 ### Step 0.4：確認 ncu metric 名稱
 
 ```bash
