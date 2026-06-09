@@ -60,12 +60,17 @@ METRIC_MAP = {
     # Utilization
     "dram_utilization_pct":    "DRAM Throughput",     # unit: %
     "sm_utilization_pct":      "Compute (SM) Throughput",  # unit: %
-    "fp32_utilization_pct":    "__not_available__",   # no FP32-pipe metric in CSV
-    "warp_exec_efficiency":    "__not_available__",   # no per-thread efficiency in CSV
+    "issue_slots_busy_pct":    "Issue Slots Busy",    # % of cycles with ≥1 instruction issued
+    # Warp execution efficiency is computed, not a direct CSV column (see compute_warp_exec_efficiency)
+
+    # Bottleneck indicators used in heuristic stall analysis
+    "warp_cycles_per_inst":    "Warp Cycles Per Issued Instruction",  # high → stalling
+    "branch_efficiency_pct":   "Branch Efficiency",                   # low  → divergence
+    "eligible_warps":          "Eligible Warps Per Scheduler",        # low  → latency not hidden
 }
 
 # ncu --set full --csv does not export per-reason stall percentages as individual rows.
-# Set to a prefix that will never match so get_stall_top3 returns an empty list.
+# Stall analysis is approximated from available bottleneck indicators (see get_stall_indicators).
 STALL_PREFIX = "__no_stall_metrics__"
 STALL_SUFFIX = ".pct"
 
@@ -138,6 +143,63 @@ def get_metric(metrics, our_key, default="N/A"):
     return default
 
 
+def compute_warp_exec_efficiency(metrics):
+    """
+    Warp execution efficiency = avg non-predicated-off threads per warp / 32.
+    ncu does not expose this directly in --set full --csv; we derive it from
+    'Avg. Not Predicated Off Threads Per Warp'.
+    """
+    key = "Avg. Not Predicated Off Threads Per Warp"
+    if key in metrics:
+        try:
+            val = float(metrics[key][0].replace(",", ""))
+            return f"{val / 32 * 100:.1f}%"
+        except (ValueError, TypeError):
+            pass
+    return "N/A"
+
+
+def get_stall_indicators(metrics):
+    """
+    Derive bottleneck indicators from available --set full metrics.
+    Returns a list of (label, value_str) sorted by severity (worst first).
+
+    ncu --set full --csv does not include per-reason warp-stall breakdown.
+    We use three proxy metrics as heuristic bottleneck signals:
+      - Warp Cycles Per Issued Instruction  (>20 → likely memory-bound)
+      - Branch Efficiency                   (<90% → significant divergence)
+      - Eligible Warps Per Scheduler        (<1.0 → insufficient latency hiding)
+    """
+    indicators = []
+
+    cpi_raw = get_metric(metrics, "warp_cycles_per_inst")
+    try:
+        cpi = float(cpi_raw.replace(",", ""))
+        indicators.append(("warp_cycles_per_issued_inst", cpi_raw + " cycles",
+                           cpi))  # sort key: higher = worse
+    except (ValueError, TypeError):
+        pass
+
+    be_raw = get_metric(metrics, "branch_efficiency_pct")
+    try:
+        be = float(be_raw.replace(",", ""))
+        indicators.append(("branch_efficiency", f"{be:.1f}%",
+                           100 - be))  # sort key: lower efficiency = worse
+    except (ValueError, TypeError):
+        pass
+
+    ew_raw = get_metric(metrics, "eligible_warps")
+    try:
+        ew = float(ew_raw.replace(",", ""))
+        indicators.append(("eligible_warps_per_scheduler", ew_raw,
+                           max(0, 4 - ew)))  # sort key: fewer warps = worse
+    except (ValueError, TypeError):
+        pass
+
+    indicators.sort(key=lambda x: x[2], reverse=True)
+    return [(label, val) for label, val, _ in indicators]
+
+
 def get_stall_top3(metrics):
     """Extract top 3 warp stall reasons by percentage."""
     stalls = []
@@ -206,6 +268,7 @@ def format_kernel_xml(kernel_name, metrics, indent="  ", rank=None):
     i3 = indent + "    "
 
     stalls = get_stall_top3(metrics)
+    stall_indicators = get_stall_indicators(metrics)
     limiter = occupancy_limiting_factor(metrics)
 
     time_ms = ns_to_ms(get_metric(metrics, "kernel_time_ns", "0"))
@@ -242,15 +305,21 @@ def format_kernel_xml(kernel_name, metrics, indent="  ", rank=None):
 
     xml.append(f"{i2}<Compute>")
     xml.append(f"{i3}<SM_Utilization>{get_metric(metrics, 'sm_utilization_pct')}%</SM_Utilization>")
-    xml.append(f"{i3}<FP32_Utilization>{get_metric(metrics, 'fp32_utilization_pct')}%</FP32_Utilization>")
-    xml.append(f"{i3}<Warp_Execution_Efficiency>{get_metric(metrics, 'warp_exec_efficiency')}</Warp_Execution_Efficiency>")
+    xml.append(f"{i3}<Issue_Slots_Busy>{get_metric(metrics, 'issue_slots_busy_pct')}%</Issue_Slots_Busy>")
+    xml.append(f"{i3}<Warp_Execution_Efficiency>{compute_warp_exec_efficiency(metrics)}</Warp_Execution_Efficiency>")
     xml.append(f"{i2}</Compute>")
 
     xml.append(f"{i2}<Stall_Analysis>")
     xml.append(f"{i3}<Top_Stalls>")
-    for reason, pct in stalls:
-        xml.append(f'{i3}  <Stall reason="{reason}" percentage="{pct:.1f}%"/>')
-    if not stalls:
+    if stalls:
+        # Per-reason stall data (only available when explicit ncu --metrics are added)
+        for reason, pct in stalls:
+            xml.append(f'{i3}  <Stall reason="{reason}" percentage="{pct:.1f}%"/>')
+    elif stall_indicators:
+        # Bottleneck indicators derived from --set full metrics (heuristic proxies)
+        for label, val in stall_indicators:
+            xml.append(f'{i3}  <Bottleneck name="{label}" value="{val}"/>')
+    else:
         xml.append(f'{i3}  <Stall reason="unknown" percentage="N/A"/>')
     xml.append(f"{i3}</Top_Stalls>")
     xml.append(f"{i2}</Stall_Analysis>")

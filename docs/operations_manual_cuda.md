@@ -209,7 +209,7 @@ code, state your reasoning and best estimate.
 </Hardware_Spec>
 
 <Source_Code>
-[在此貼上 baseline/main.cu 的完整內容]
+[在此貼上 experiment-cuda/results/{benchmark}/baseline/main.cu 的完整內容]
 </Source_Code>
 
 <Template>
@@ -276,15 +276,10 @@ code, state your reasoning and best estimate.
 </Context_Normalization>
 </Template>
 
-Fill in every field of the template. Output only the completed XML.
-```
-
-### 儲存 context：
-
-將 LLM 回傳的 XML 存到兩個地方（Cell B 和 Cell C 共用）：
-```
-experiment-cuda/results/{benchmark}/cell_b/context.xml
-experiment-cuda/results/{benchmark}/cell_c/context.xml
+Fill in every field of the template. Output only the completed XML,
+and write it to both of the following paths:
+  experiment-cuda/results/{benchmark}/cell_b/context.xml
+  experiment-cuda/results/{benchmark}/cell_c/context.xml
 ```
 
 ---
@@ -317,10 +312,10 @@ Do not include explanatory text outside of code comments.
 Optimize the following CUDA code for maximum GPU performance.
 
 [⚠ 如果此 benchmark 有 per-benchmark note（見文末附錄），在此插入]
+experiment-cuda/results/{benchmark}/baseline/main.cu
 
-<Source_Code>
-[在此貼上 baseline/main.cu 的完整內容]
-</Source_Code>
+Please write the modified code to 
+experiment-cuda/results/{benchmark}/cell_a/round_1/attempt_1/main.cu
 ```
 
 > **查詢 per-benchmark note：** 文末「附錄：Per-Benchmark Prompt Notes」列出了需要特殊說明的 benchmark（目前只有 `blas-gemm`）。若當前 benchmark 不在表中，略去即可。
@@ -345,10 +340,11 @@ Optimize the following CUDA code for maximum GPU performance.
 
 4. **如果通過** → profile 並記錄：
    ```bash
-   # 複製 passing code
+   # 存檔：複製通過的 source code 為 final.cu（僅供紀錄，不需重新編譯）
    cp experiment-cuda/results/{benchmark}/cell_a/round_1/attempt_1/main.cu \
       experiment-cuda/results/{benchmark}/cell_a/round_1/final.cu
 
+   # 直接 profile 已編譯好的 binary（step 1 compile.sh 的產出）
    ncu --set full --csv \
        --log-file experiment-cuda/results/{benchmark}/cell_a/round_1/nsight_raw.csv \
        experiment-cuda/results/{benchmark}/cell_a/round_1/attempt_1/main [arguments]
@@ -370,16 +366,16 @@ Optimize the following CUDA code for maximum GPU performance.
 
 ```
 Use the following hardware and algorithmic context to guide your optimization.
-
-[在此貼上 cell_b/context.xml 的完整內容]
+Read experiment-cuda/results/{benchmark}/cell_b/context.xml
 
 Optimize the following CUDA code for maximum GPU performance.
 
 [⚠ 如果此 benchmark 有 per-benchmark note，在此插入（見文末附錄）]
 
-<Source_Code>
-[在此貼上 baseline/main.cu 的完整內容]
-</Source_Code>
+Read experiment-cuda/results/{benchmark}/baseline/main.cu
+
+Please write the optimized code to
+experiment-cuda/results/{benchmark}/cell_b/round_1/attempt_1/main.cu
 ```
 
 ### LLM 回覆後：
@@ -397,20 +393,20 @@ Optimize the following CUDA code for maximum GPU performance.
 
 **System Prompt：** 同 Cell A / Cell B。
 
-**User Prompt：** 與 Cell B 完全相同：
+**User Prompt：** 與 Cell B 完全相同（僅路徑改為 cell_c）：
 
 ```
 Use the following hardware and algorithmic context to guide your optimization.
-
-[在此貼上 cell_c/context.xml 的完整內容]
+Read experiment-cuda/results/{benchmark}/cell_c/context.xml
 
 Optimize the following CUDA code for maximum GPU performance.
 
 [⚠ 如果此 benchmark 有 per-benchmark note，在此插入（見文末附錄）]
 
-<Source_Code>
-[在此貼上 baseline/main.cu 的完整內容]
-</Source_Code>
+Read experiment-cuda/results/{benchmark}/baseline/main.cu
+
+Please write the optimized code to
+experiment-cuda/results/{benchmark}/cell_c/round_1/attempt_1/main.cu
 ```
 
 LLM 回覆後：
@@ -422,7 +418,7 @@ bash experiment-cuda/scripts/compile.sh <HeCBench_Path> {benchmark} cell_c 1 1
 # 2. 驗證
 bash experiment-cuda/scripts/validate.sh <HeCBench_Path> {benchmark} cell_c 1 1
 
-# 3. Profile
+# 3. Profile（用 step 1 compile.sh 產出的 binary，不需重新編譯）
 ncu --set full --csv \
     --log-file experiment-cuda/results/{benchmark}/cell_c/round_1/nsight_raw.csv \
     experiment-cuda/results/{benchmark}/cell_c/round_1/attempt_1/main [arguments]
@@ -456,10 +452,11 @@ Your previous kernels have been profiled. Below are the full Nsight Compute
 results for both the baseline and your version. Kernels are listed in order
 of execution time (slowest first).
 
-[在此貼上 feedback.xml 的完整內容]
+Read experiment-cuda/results/{benchmark}/cell_c/round_2/feedback.xml
 
 Based on this profiling data, produce an improved version of the complete CUDA
-source. Output only the complete, compilable CUDA source code.
+source. Output only the complete, compilable CUDA source code, and write it to
+experiment-cuda/results/{benchmark}/cell_c/round_2/attempt_1/main.cu
 ```
 
 LLM 回覆後：
@@ -500,10 +497,11 @@ Your previous kernels have been profiled. Below are the full Nsight Compute
 results for both the baseline and your version. Kernels are listed in order
 of execution time (slowest first).
 
-[在此貼上 cell_c/round_3/feedback.xml 的完整內容]
+Read experiment-cuda/results/{benchmark}/cell_c/round_3/feedback.xml
 
 Based on this profiling data, produce an improved version of the complete CUDA
-source. Output only the complete, compilable CUDA source code.
+source. Output only the complete, compilable CUDA source code, and write it to
+experiment-cuda/results/{benchmark}/cell_c/round_3/attempt_1/main.cu
 ```
 
 LLM 回覆後：
@@ -531,14 +529,14 @@ Round 3 完成後，Cell C 最終結果 = **所有 passing round 中 kernel time
 ```
 Your submission failed with the following error:
 
-<Error>
-[在此貼上 compile.log 或 validate.log 的原始內容，不做任何修改]
-</Error>
+Read experiment-cuda/results/{benchmark}/{cell}/round_{N}/attempt_{M}/compile.log
+(or validate.log if compilation succeeded but validation failed)
 
-Fix the issue and resubmit the complete CUDA source code.
+Fix the issue and write the corrected complete CUDA source code to
+experiment-cuda/results/{benchmark}/{cell}/round_{N}/attempt_{M+1}/main.cu
 ```
 
-LLM 回覆後，將新的 `.cu` 存到下一個 attempt 目錄，再次執行：
+LLM 回覆後，再次執行：
 ```bash
 bash experiment-cuda/scripts/compile.sh <HeCBench_Path> {benchmark} {cell} {round} {attempt}
 bash experiment-cuda/scripts/validate.sh <HeCBench_Path> {benchmark} {cell} {round} {attempt}
