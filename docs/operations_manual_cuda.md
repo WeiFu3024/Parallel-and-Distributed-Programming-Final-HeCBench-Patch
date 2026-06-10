@@ -92,39 +92,41 @@ python experiment-cuda/scripts/profile_to_xml.py single \
 # nsight.xml 是精簡摘要，體積小，正常 commit。
 ```
 
-各 benchmark 的標準引數：
+各 benchmark 的 ncu 引數（problem size 與 `validate.sh` 相同；**timing loop 預設 N=10 次**，建議 5–10）：
 
-| benchmark | HeCBench 目錄 | arguments |
+> `run_pipeline.sh` 預設 `--ncu-repeat 10`；手動跑 ncu 時請將下表最後一個數字（或 `-n` / `-i` / `-r` / `--i=`）換成所需的 N。
+
+| benchmark | HeCBench 目錄 | arguments（N=10） |
 |-----------|-------------|-----------|
-| attention | attention-cuda | `65536 2048 0 1000` |
-| attention-paged | attention-paged-cuda | `8 32 128 4096 128 100` |
-| blas-gemm | blas-gemm-cuda | `4096 4096 4096 100` |
-| convolution3D | convolution3D-cuda | `32 96 256 26 26 5 100` |
-| layernorm | layernorm-cuda | `8 1024 768 2000` |
-| maxpool3d | maxpool3d-cuda | `2048 2048 96 100` |
-| bilateral | bilateral-cuda | `2960 1440 0.5 0.5 1000` |
-| black-scholes | black-scholes-cuda | `100` |
+| attention | attention-cuda | `65536 2048 0 10` |
+| attention-paged | attention-paged-cuda | `8 32 128 4096 128 10` |
+| blas-gemm | blas-gemm-cuda | `4096 4096 4096 10` |
+| convolution3D | convolution3D-cuda | `32 96 256 26 26 5 10` |
+| layernorm | layernorm-cuda | `8 1024 768 10` |
+| maxpool3d | maxpool3d-cuda | `2048 2048 96 10` |
+| bilateral | bilateral-cuda | `2960 1440 0.5 0.5 10` |
+| black-scholes | black-scholes-cuda | `10` |
 | binomial | binomial-cuda | （無引數） |
-| fft | fft-cuda | `3 100` |
+| fft | fft-cuda | `3 10` |
 | jacobi | jacobi-cuda | （無引數） |
 | mcpr ¹ | mcpr-cuda | `<src_dir>/alphas.csv 10` |
-| bh | bh-cuda | `100000 100` |
-| hotspot ² | hotspot-cuda | `512 2 200 <HeCBench_Path>/data/hotspot/temp_512 <HeCBench_Path>/data/hotspot/power_512 output.out` |
-| fluidSim | fluidSim-cuda | `10000` |
+| bh | bh-cuda | `100000 10` |
+| hotspot ² | hotspot-cuda | `512 2 200 <HeCBench_Path>/src/data/hotspot/temp_512 <HeCBench_Path>/src/data/hotspot/power_512 /tmp/hotspot_output.out` |
+| fluidSim | fluidSim-cuda | `1000`（= 100 × N 粒子數） |
 | d2q9-bgk ³ | d2q9-bgk-cuda | `<src_dir>/Inputs/input_256x256.params <src_dir>/Obstacles/obstacles_256x256.dat` |
-| heartwall ² | heartwall-cuda | `104` |
-| bfs ² | bfs-cuda | `<HeCBench_Path>/data/bfs/graph1MW_6.txt` |
-| page-rank | page-rank-cuda | `-n 20000 -i 100` |
-| sssp | sssp-cuda | `-g 120 -t 1 -w 10 -r 100` |
-| nw | nw-cuda | `16384 10 100` |
-| mis | mis-cuda | `<src_dir>/internet.egr 100` |
-| scan | scan-cuda | `268435456 100` |
-| bscan | bscan-cuda | `1000` |
-| histogram | histogram-cuda | `--i=100` |
-| segment-reduce | segment-reduce-cuda | `16384 100` |
+| heartwall ² | heartwall-cuda | `104`（需從 `src/heartwall-cuda/` 執行） |
+| bfs ² | bfs-cuda | `<HeCBench_Path>/src/data/bfs/graph1MW_6.txt` |
+| page-rank | page-rank-cuda | `-n 20000 -i 10` |
+| sssp | sssp-cuda | `-g 120 -t 1 -w 10 -r 10 -f experiment-cuda/scripts/sssp_val_input.dat -c experiment-cuda/scripts/sssp_val_ref.out` |
+| nw | nw-cuda | `16384 10 10` |
+| mis | mis-cuda | `<src_dir>/internet.egr 10` |
+| scan | scan-cuda | `1048576 10` |
+| bscan | bscan-cuda | `100`（= 10 × N 陣列規模） |
+| histogram | histogram-cuda | `--i=10` |
+| segment-reduce | segment-reduce-cuda | `1 10` |
 | sc | sc-cuda | `-a 0.1` |
-| sort | sort-cuda | `3 100` |
-| transpose ⁴ | matrixT-cuda | `16384 16384 200` |
+| sort | sort-cuda | `3 10` |
+| transpose ⁴ | matrixT-cuda | `16384 16384 10` |
 | lzss ⁵ | lzss-cuda | `-i <inputfile> -n 10` |
 
 **備註：**
@@ -153,11 +155,14 @@ python experiment-cuda/scripts/profile_to_xml.py single \
 腳本會自動跳過沒有 `main.cu` 的目錄；任一階段失敗則不繼續後續步驟。
 
 ```bash
-# 全部 baseline
+# 全部 baseline（30 個 benchmark）
 bash experiment-cuda/scripts/run_pipeline.sh <HeCBench_Path> --target baseline
 
+# 只跑負責的 10 個 benchmark（見下方 assigned 列表）
+bash experiment-cuda/scripts/run_pipeline.sh <HeCBench_Path> --target baseline --benchmark-set assigned
+
 # 全部 cell_a（所有有 main.cu 的 attempt）
-bash experiment-cuda/scripts/run_pipeline.sh <HeCBench_Path> --target cell_a
+bash experiment-cuda/scripts/run_pipeline.sh <HeCBench_Path> --target cell_a --benchmark-set assigned
 
 # cell_c 只跑 round 2
 bash experiment-cuda/scripts/run_pipeline.sh <HeCBench_Path> --target cell_c --round 2
@@ -176,8 +181,14 @@ bash experiment-cuda/scripts/run_pipeline.sh --help
 | `--target` | `baseline` / `cell_a` / `cell_b` / `cell_c` / `all` | `all` | 要跑哪種 setting |
 | `--round` | `1` / `2` / `3` / `all` | `all` | 僅 `cell_c` 有效 |
 | `--attempt` | `1` / `2` / `3` / `all` | `all` | 只處理有 `main.cu` 的 attempt |
-| `--benchmark` | 名稱或 `all` | `all` | 限定單一 benchmark |
+| `--benchmark` | 名稱或 `all` | `all` | 限定單一 benchmark（優先於 `--benchmark-set`） |
+| `--benchmark-set` | `all` / `assigned` | `all` | `assigned` = 只跑負責的 10 個 benchmark |
+| `--ncu-repeat` | 正整數 | `10` | ncu timing loop 次數（建議 5–10） |
 | `--sm-arch` | 如 `sm_86` | `auto` | 傳給 `compile.sh` |
+
+**`--benchmark-set assigned` 包含：**
+
+`blas-gemm`, `maxpool3d`, `binomial`, `mcpr`, `fluidSim`, `bfs`, `nw`, `bscan`, `sc`, `lzss`
 
 **每個 target 的流程：**
 
@@ -187,7 +198,8 @@ bash experiment-cuda/scripts/run_pipeline.sh --help
 | `cell_a` / `cell_b` / `cell_c` | compile → validate → ncu → `nsight.xml` |
 | `cell_c` round R 成功後 | 額外產生 `round_{R+1}/feedback.xml`（需 baseline 的 `nsight_raw.csv` 已存在） |
 
-`ncu` 使用的 benchmark 引數與上方 Step 0.3 表格相同（profiling 規模）。
+`ncu` 使用的 benchmark 引數與上方 Step 0.3 表格相同（預設 timing loop N=10，可用 `--ncu-repeat` 調整）。
+`validate.sh` 仍維持 1 次 iteration 以加快正確性檢查。
 也可選擇不用此腳本，照下方各 Cell 步驟手動執行。
 
 ### Step 0.4：確認 ncu metric 名稱

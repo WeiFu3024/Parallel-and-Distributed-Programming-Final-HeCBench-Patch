@@ -8,15 +8,20 @@
 #   bash run_pipeline.sh <hecbench_path> [options]
 #
 # Options:
-#   --target TARGET     baseline | cell_a | cell_b | cell_c | all   (default: all)
-#   --round ROUNDS      1 | 2 | 3 | all                             (default: all)
-#                       Only applies to cell_c (cell_a/cell_b always use round 1)
-#   --attempt ATTEMPTS  1 | 2 | 3 | all                             (default: all)
-#   --benchmark BENCH   One benchmark name or "all"                   (default: all)
-#   --sm-arch ARCH      CUDA arch, e.g. sm_86                        (default: auto)
+#   --target TARGET       baseline | cell_a | cell_b | cell_c | all   (default: all)
+#   --round ROUNDS        1 | 2 | 3 | all                             (default: all)
+#                         Only applies to cell_c (cell_a/cell_b always use round 1)
+#   --attempt ATTEMPTS    1 | 2 | 3 | all                             (default: all)
+#   --benchmark BENCH     One benchmark name or "all"                   (default: all)
+#   --benchmark-set SET   all | assigned                                (default: all)
+#                         assigned = blas-gemm maxpool3d binomial mcpr fluidSim
+#                                    bfs nw bscan sc lzss
+#   --ncu-repeat N        Timing-loop iterations for ncu (default: 10; suggest 5–10)
+#   --sm-arch ARCH        CUDA arch, e.g. sm_86                        (default: auto)
 #
 # Examples:
 #   bash run_pipeline.sh ~/HeCBench --target baseline
+#   bash run_pipeline.sh ~/HeCBench --target baseline --benchmark-set assigned
 #   bash run_pipeline.sh ~/HeCBench --target cell_a --benchmark bfs
 #   bash run_pipeline.sh ~/HeCBench --target cell_c --round 2
 #   bash run_pipeline.sh ~/HeCBench --target all --benchmark attention
@@ -24,31 +29,41 @@
 # Notes:
 #   - baseline has no validate.sh step (compile → ncu only)
 #   - cell_c: after a successful round R profile, generates round_{R+1}/feedback.xml
-#   - ncu uses profiling-scale arguments from operations_manual_cuda.md Step 0.3
+#   - ncu uses validate-scale problem sizes with --ncu-repeat timing iterations (default 10)
 
 set -euo pipefail
 
 if [ $# -eq 0 ] || [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]; then
-  sed -n '2,24p' "$0"
+  sed -n '2,28p' "$0"
   exit 0
 fi
 
-HECBENCH_PATH="${1:?Usage: $0 <hecbench_path> [--target ...] [--round ...] [--attempt ...] [--benchmark ...] [--sm-arch ...]}"
+HECBENCH_PATH="${1:?Usage: $0 <hecbench_path> [--target ...] [--round ...] [--attempt ...] [--benchmark ...] [--benchmark-set ...] [--ncu-repeat ...] [--sm-arch ...]}"
 shift
 
 TARGET="all"
 ROUNDS="all"
 ATTEMPTS="all"
 BENCHMARK="all"
+BENCHMARK_SET="all"
+NCU_REPEAT="10"
 SM_ARCH="auto"
+
+# Operator-assigned benchmark subset (see operations_manual_cuda.md Step 0.3b)
+ASSIGNED_BENCHMARKS=(
+  blas-gemm maxpool3d binomial mcpr fluidSim
+  bfs nw bscan sc lzss
+)
 
 while [ $# -gt 0 ]; do
   case "$1" in
-    --target)    TARGET="${2:?Missing value for --target}"; shift 2 ;;
-    --round)     ROUNDS="${2:?Missing value for --round}"; shift 2 ;;
-    --attempt)   ATTEMPTS="${2:?Missing value for --attempt}"; shift 2 ;;
-    --benchmark) BENCHMARK="${2:?Missing value for --benchmark}"; shift 2 ;;
-    --sm-arch)   SM_ARCH="${2:?Missing value for --sm-arch}"; shift 2 ;;
+    --target)        TARGET="${2:?Missing value for --target}"; shift 2 ;;
+    --round)         ROUNDS="${2:?Missing value for --round}"; shift 2 ;;
+    --attempt)       ATTEMPTS="${2:?Missing value for --attempt}"; shift 2 ;;
+    --benchmark)     BENCHMARK="${2:?Missing value for --benchmark}"; shift 2 ;;
+    --benchmark-set) BENCHMARK_SET="${2:?Missing value for --benchmark-set}"; shift 2 ;;
+    --ncu-repeat)    NCU_REPEAT="${2:?Missing value for --ncu-repeat}"; shift 2 ;;
+    --sm-arch)       SM_ARCH="${2:?Missing value for --sm-arch}"; shift 2 ;;
     *)
       echo "ERROR: Unknown argument: $1" >&2
       exit 1
@@ -93,33 +108,37 @@ get_src_dir() {
   esac
 }
 
-# Return benchmark-specific ncu arguments (profiling scale; see manual Step 0.3).
-# Prints a single line of args; empty string means no arguments.
+# Return benchmark-specific ncu arguments.
+# Problem sizes match validate.sh; timing-loop iterations use NCU_REPEAT (default 10).
+# Prints a single line of args; __NO_ARGS__ = no arguments.
 get_ncu_args_line() {
   local bench="$1"
   local src_dir
+  local n="${NCU_REPEAT}"
+  local fluid_particles=$((100 * n))
+  local bscan_size=$((10 * n))
   src_dir="$(get_src_dir "${bench}")"
 
   case "${bench}" in
-    attention)         echo "65536 2048 0 1000" ;;
-    attention-paged) echo "8 32 128 4096 128 100" ;;
-    blas-gemm)         echo "4096 4096 4096 100" ;;
-    convolution3D)     echo "32 96 256 26 26 5 100" ;;
-    layernorm)         echo "8 1024 768 2000" ;;
-    maxpool3d)         echo "2048 2048 96 100" ;;
-    bilateral)         echo "2960 1440 0.5 0.5 1000" ;;
-    black-scholes)     echo "100" ;;
+    attention)         echo "65536 2048 0 ${n}" ;;
+    attention-paged)   echo "8 32 128 4096 128 ${n}" ;;
+    blas-gemm)         echo "4096 4096 4096 ${n}" ;;
+    convolution3D)     echo "32 96 256 26 26 5 ${n}" ;;
+    layernorm)         echo "8 1024 768 ${n}" ;;
+    maxpool3d)         echo "2048 2048 96 ${n}" ;;
+    bilateral)         echo "2960 1440 0.5 0.5 ${n}" ;;
+    black-scholes)     echo "${n}" ;;
     binomial)          echo "__NO_ARGS__" ;;
-    fft)               echo "3 100" ;;
+    fft)               echo "3 ${n}" ;;
     jacobi)            echo "__NO_ARGS__" ;;
     mcpr)
       if [ -f "${src_dir}/alphas.csv" ]; then
-        echo "${src_dir}/alphas.csv 10"
+        echo "${src_dir}/alphas.csv ${n}"
       else
         echo "__MISSING__"
       fi
       ;;
-    bh)                echo "100000 100" ;;
+    bh)                echo "100000 ${n}" ;;
     hotspot)
       local temp="${HECBENCH_PATH}/src/data/hotspot/temp_512"
       if [ ! -f "${temp}" ]; then
@@ -132,7 +151,7 @@ get_ncu_args_line() {
         echo "__MISSING__"
       fi
       ;;
-    fluidSim)          echo "10000" ;;
+    fluidSim)          echo "${fluid_particles}" ;;
     d2q9-bgk)
       local inputs="${src_dir}/Inputs/input_256x256.params"
       local obstacles="${src_dir}/Obstacles/obstacles_256x256.dat"
@@ -154,35 +173,43 @@ get_ncu_args_line() {
         echo "__MISSING__"
       fi
       ;;
-    page-rank)         echo "-n 20000 -i 100" ;;
-    sssp)              echo "-g 120 -t 1 -w 10 -r 100" ;;
-    nw)                echo "16384 10 100" ;;
-    mis)
-      if [ -f "${src_dir}/internet.egr" ]; then
-        echo "${src_dir}/internet.egr 100"
+    page-rank)         echo "-n 20000 -i ${n}" ;;
+    sssp)
+      local val_input="${SCRIPT_DIR}/sssp_val_input.dat"
+      local val_ref="${SCRIPT_DIR}/sssp_val_ref.out"
+      if [ -f "${val_input}" ] && [ -f "${val_ref}" ]; then
+        echo "-g 120 -t 1 -w 10 -r ${n} -f ${val_input} -c ${val_ref}"
       else
         echo "__MISSING__"
       fi
       ;;
-    scan)              echo "268435456 100" ;;
-    bscan)             echo "1000" ;;
-    histogram)         echo "--i=100" ;;
-    segment-reduce)    echo "16384 100" ;;
+    nw)                echo "16384 10 ${n}" ;;
+    mis)
+      if [ -f "${src_dir}/internet.egr" ]; then
+        echo "${src_dir}/internet.egr ${n}"
+      else
+        echo "__MISSING__"
+      fi
+      ;;
+    scan)              echo "1048576 ${n}" ;;
+    bscan)             echo "${bscan_size}" ;;
+    histogram)         echo "--i=${n}" ;;
+    segment-reduce)    echo "1 ${n}" ;;
     sc)                echo "-a 0.1" ;;
-    sort)              echo "3 100" ;;
-    transpose)         echo "16384 16384 200" ;;
+    sort)              echo "3 ${n}" ;;
+    transpose)         echo "16384 16384 ${n}" ;;
     lzss)
       local input="${RESULTS_DIR}/heartwall/baseline/main.cu"
       if [ ! -f "${input}" ]; then
         input="$(find "${RESULTS_DIR}" -name "main.cu" 2>/dev/null | head -1 || true)"
       fi
       if [ -n "${input}" ] && [ -f "${input}" ]; then
-        echo "-i ${input} -n 10"
+        echo "-i ${input} -n ${n}"
       else
         echo "__MISSING__"
       fi
       ;;
-    accuracy)          echo "8192 10000 10 100" ;;
+    accuracy)          echo "8192 10000 10 ${n}" ;;
     aes)
       local bmp="${HECBENCH_PATH}/src/urng-sycl/URNG_Input.bmp"
       if [ -f "${bmp}" ]; then
@@ -197,11 +224,32 @@ get_ncu_args_line() {
   esac
 }
 
+validate_benchmark_set() {
+  case "${BENCHMARK_SET}" in
+    all|assigned) ;;
+    *)
+      echo "ERROR: --benchmark-set must be 'all' or 'assigned' (got: ${BENCHMARK_SET})" >&2
+      exit 1
+      ;;
+  esac
+}
+
 list_benchmarks() {
   if [ "${BENCHMARK}" != "all" ]; then
     echo "${BENCHMARK}"
     return
   fi
+
+  validate_benchmark_set
+
+  if [ "${BENCHMARK_SET}" = "assigned" ]; then
+    local bench
+    for bench in "${ASSIGNED_BENCHMARKS[@]}"; do
+      echo "${bench}"
+    done
+    return
+  fi
+
   if [ ! -d "${RESULTS_DIR}" ]; then
     echo "ERROR: Results directory not found: ${RESULTS_DIR}" >&2
     exit 1
@@ -436,11 +484,15 @@ main() {
     echo "ERROR: profile_to_xml.py not found: ${PROFILE_PY}" >&2
     exit 1
   fi
+  if ! [[ "${NCU_REPEAT}" =~ ^[0-9]+$ ]] || [ "${NCU_REPEAT}" -lt 1 ]; then
+    echo "ERROR: --ncu-repeat must be a positive integer (got: ${NCU_REPEAT})" >&2
+    exit 1
+  fi
 
   local bench bench_list
   bench_list="$(list_benchmarks)"
 
-  log "Pipeline start | target=${TARGET} round=${ROUNDS} attempt=${ATTEMPTS} benchmark=${BENCHMARK}"
+  log "Pipeline start | target=${TARGET} round=${ROUNDS} attempt=${ATTEMPTS} benchmark=${BENCHMARK} benchmark_set=${BENCHMARK_SET} ncu_repeat=${NCU_REPEAT}"
 
   while IFS= read -r bench; do
     [ -n "${bench}" ] || continue
