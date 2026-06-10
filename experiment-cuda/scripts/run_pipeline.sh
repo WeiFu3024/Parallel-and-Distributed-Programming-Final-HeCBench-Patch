@@ -17,6 +17,7 @@
 #                         assigned = blas-gemm maxpool3d binomial mcpr fluidSim
 #                                    bfs nw bscan sc lzss
 #   --ncu-repeat N        Timing-loop iterations for ncu (default: 10; suggest 5–10)
+#   --skip-existing       Skip ncu when nsight_raw.csv exists and profile_to_xml succeeds
 #   --sm-arch ARCH        CUDA arch, e.g. sm_86                        (default: auto)
 #
 # Examples:
@@ -38,7 +39,7 @@ if [ $# -eq 0 ] || [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]; then
   exit 0
 fi
 
-HECBENCH_PATH="${1:?Usage: $0 <hecbench_path> [--target ...] [--round ...] [--attempt ...] [--benchmark ...] [--benchmark-set ...] [--ncu-repeat ...] [--sm-arch ...]}"
+HECBENCH_PATH="${1:?Usage: $0 <hecbench_path> [--target ...] [--round ...] [--attempt ...] [--benchmark ...] [--benchmark-set ...] [--ncu-repeat ...] [--skip-existing] [--sm-arch ...]}"
 shift
 
 TARGET="all"
@@ -47,6 +48,7 @@ ATTEMPTS="all"
 BENCHMARK="all"
 BENCHMARK_SET="all"
 NCU_REPEAT="10"
+SKIP_EXISTING=false
 SM_ARCH="auto"
 
 # Operator-assigned benchmark subset (see operations_manual_cuda.md Step 0.3b)
@@ -63,6 +65,7 @@ while [ $# -gt 0 ]; do
     --benchmark)     BENCHMARK="${2:?Missing value for --benchmark}"; shift 2 ;;
     --benchmark-set) BENCHMARK_SET="${2:?Missing value for --benchmark-set}"; shift 2 ;;
     --ncu-repeat)    NCU_REPEAT="${2:?Missing value for --ncu-repeat}"; shift 2 ;;
+    --skip-existing) SKIP_EXISTING=true; shift ;;
     --sm-arch)       SM_ARCH="${2:?Missing value for --sm-arch}"; shift 2 ;;
     *)
       echo "ERROR: Unknown argument: $1" >&2
@@ -277,6 +280,34 @@ list_attempts() {
   fi
 }
 
+convert_ncu_csv_to_xml() {
+  local raw_csv="$1"
+  local xml_out="$2"
+  python3 "${PROFILE_PY}" single \
+      --input "${raw_csv}" \
+      --output "${xml_out}"
+}
+
+# Return 0 if an existing nsight_raw.csv was verified (via profile_to_xml) and ncu can be skipped.
+try_use_existing_ncu_csv() {
+  local label="$1"
+  local raw_csv="$2"
+  local xml_out="$3"
+
+  if [ "${SKIP_EXISTING}" != true ] || [ ! -f "${raw_csv}" ]; then
+    return 1
+  fi
+
+  log "CHECK ${label}: verifying existing nsight_raw.csv"
+  if convert_ncu_csv_to_xml "${raw_csv}" "${xml_out}"; then
+    log "SKIP ${label}: ncu (existing csv verified, nsight.xml refreshed)"
+    return 0
+  fi
+
+  log "WARN ${label}: existing nsight_raw.csv unusable, re-running ncu"
+  return 1
+}
+
 run_ncu() {
   local bench="$1"
   local label="$2"
@@ -320,9 +351,7 @@ run_ncu() {
         "${binary}" "${ncu_args[@]}"
   fi
 
-  python3 "${PROFILE_PY}" single \
-      --input "${raw_csv}" \
-      --output "${xml_out}"
+  convert_ncu_csv_to_xml "${raw_csv}" "${xml_out}"
 }
 
 generate_cell_c_feedback() {
@@ -343,6 +372,20 @@ generate_cell_c_feedback() {
   fi
 
   mkdir -p "$(dirname "${feedback_xml}")"
+
+  if [ "${SKIP_EXISTING}" = true ] && [ -f "${feedback_xml}" ]; then
+    log "CHECK ${bench}/cell_c/round_${next_round}/feedback.xml: verifying existing feedback"
+    if python3 "${PROFILE_PY}" feedback \
+        --baseline "${baseline_csv}" \
+        --yours "${yours_csv}" \
+        --round "${round}" \
+        --output "${feedback_xml}"; then
+      log "SKIP ${bench}/cell_c round_${round} feedback (existing verified)"
+      return 0
+    fi
+    log "WARN ${bench}/cell_c round_${round}: existing feedback.xml unusable, regenerating"
+  fi
+
   log "FEEDBACK ${bench}/cell_c round_${round} → round_${next_round}/feedback.xml"
   python3 "${PROFILE_PY}" feedback \
       --baseline "${baseline_csv}" \
@@ -358,6 +401,12 @@ process_baseline() {
 
   if [ ! -f "${dir}/main.cu" ]; then
     log "SKIP ${label}: main.cu not found"
+    COUNT_SKIP=$((COUNT_SKIP + 1))
+    return 0
+  fi
+
+  if try_use_existing_ncu_csv "${label}" \
+      "${dir}/nsight_raw.csv" "${dir}/nsight.xml"; then
     COUNT_SKIP=$((COUNT_SKIP + 1))
     return 0
   fi
@@ -407,6 +456,15 @@ process_cell_attempt() {
   if ! bash "${VALIDATE_SH}" "${HECBENCH_PATH}" "${bench}" "${cell}" "${round}" "${attempt}"; then
     log "FAIL ${label}: validate"
     COUNT_FAIL=$((COUNT_FAIL + 1))
+    return 0
+  fi
+
+  if try_use_existing_ncu_csv "${label}" \
+      "${round_dir}/nsight_raw.csv" "${round_dir}/nsight.xml"; then
+    if [ "${cell}" = "cell_c" ] && [ "${round}" -lt 3 ]; then
+      generate_cell_c_feedback "${bench}" "${round}"
+    fi
+    COUNT_SKIP=$((COUNT_SKIP + 1))
     return 0
   fi
 
@@ -492,7 +550,7 @@ main() {
   local bench bench_list
   bench_list="$(list_benchmarks)"
 
-  log "Pipeline start | target=${TARGET} round=${ROUNDS} attempt=${ATTEMPTS} benchmark=${BENCHMARK} benchmark_set=${BENCHMARK_SET} ncu_repeat=${NCU_REPEAT}"
+  log "Pipeline start | target=${TARGET} round=${ROUNDS} attempt=${ATTEMPTS} benchmark=${BENCHMARK} benchmark_set=${BENCHMARK_SET} ncu_repeat=${NCU_REPEAT} skip_existing=${SKIP_EXISTING}"
 
   while IFS= read -r bench; do
     [ -n "${bench}" ] || continue

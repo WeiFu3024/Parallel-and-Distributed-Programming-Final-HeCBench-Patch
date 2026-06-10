@@ -170,6 +170,9 @@ bash experiment-cuda/scripts/run_pipeline.sh <HeCBench_Path> --target cell_c --r
 # 單一 benchmark、全部 target
 bash experiment-cuda/scripts/run_pipeline.sh <HeCBench_Path> --target all --benchmark bfs
 
+# 跳過已有 nsight_raw.csv 的 benchmark（會先用 profile_to_xml 驗證 csv 可用）
+bash experiment-cuda/scripts/run_pipeline.sh <HeCBench_Path> --target baseline --benchmark-set assigned --skip-existing
+
 # 只看說明
 bash experiment-cuda/scripts/run_pipeline.sh --help
 ```
@@ -184,6 +187,7 @@ bash experiment-cuda/scripts/run_pipeline.sh --help
 | `--benchmark` | 名稱或 `all` | `all` | 限定單一 benchmark（優先於 `--benchmark-set`） |
 | `--benchmark-set` | `all` / `assigned` | `all` | `assigned` = 只跑負責的 10 個 benchmark |
 | `--ncu-repeat` | 正整數 | `10` | ncu timing loop 次數（建議 5–10） |
+| `--skip-existing` | （flag） | 關閉 | 若 `nsight_raw.csv` 存在且 `profile_to_xml.py` 轉換成功則跳過 ncu；失敗則重跑 ncu |
 | `--sm-arch` | 如 `sm_86` | `auto` | 傳給 `compile.sh` |
 
 **`--benchmark-set assigned` 包含：**
