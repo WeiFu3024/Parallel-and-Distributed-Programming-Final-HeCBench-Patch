@@ -49,18 +49,33 @@ bash experiment-cuda/scripts/init_experiment.sh <HeCBench_Path> benchmark1 bench
 >
 > | benchmark | 被合併進 `main.cu` 的原始檔 | 保留為獨立編譯的檔案 |
 > |-----------|--------------------------|-------------------|
+> | `aes` | `SDKBitMap.h`, `aes.h`, `kernels.cu`, `reference.cu`, `utils.cu` | — |
+> | `attention` | `kernels.h`, `reference.h` | — |
+> | `attention-paged` | 所有 `*.cuh` / `*.h` kernel 相關檔 | — |
 > | `binomial` | `kernel.cu`, `reference.cu` | — |
+> | `black-scholes` | 所有 `*Kernels*.cu/cuh`, `*Structs.cuh` | — |
+> | `convolution3D` | `conv3d_s4.cu`（其餘 kernel 本在 main.cu） | — |
+> | `fft` | `fft1D_512.h`, `ifft1D_512.h`, `reference.h` | — |
 > | `fluidSim` | `kernels.cu` | — |
 > | `heartwall` | `main.h`, `kernel/kernel.h`, `kernel/kernel.cu` | `util/avi/avilib.c`, `util/avi/avimod.c`, `util/file/file.c`, `util/timer/timer.c` |
+> | `histogram` | `histogram_*`, `test_util.h`, `mersenne.h` | — |
+> | `hotspot` | `hotspot.h`, `kernel.h` | — |
+> | `layernorm` | `common.h`, `reference.h`, `utils.cuh`, `reduce.cuh` | — |
 > | `mcpr` | `kernels.h`, `reference.h` | — |
 > | `sc` | `device_sc.cu`, `kernel.h`, `host_sc.cpp` | — |
-> | `sssp` | `kernel.cu` | — |
+> | `sort` | `sort_bottom_scan.h`, `sort_reduce.h`, `sort_top_scan.h` | — |
+> | `sssp` | `kernel.cu`, `kernel.h`, `support/*.h` | — |
+>
+> 重新合併：`python3 experiment-cuda/scripts/merge_baseline.py <HeCBench_Path> [benchmark ...]`
+> （自動跳過 operator-assigned 的 10 個 benchmark。）
 >
 > 若要新增這些 benchmark 的新 attempt（cell A/B/C），LLM 產出的也應是單一 `main.cu`，
 > 其中包含完整的 kernel code。`compile.sh` 的 `EXTRA_SRCS` 已對應調整。
 >
 > `heartwall` 的 AVI/timer/file utility files 是 I/O 基礎設施，不是 CUDA 優化目標，
 > 因此仍保留為獨立 `.c` 檔案透過 `compile.sh` 連結。
+>
+> **例外：** `segment-reduce` 使用 `thrust::reduce_by_key`，無自訂 `__global__` kernel，不做合併。
 
 ### Step 0.3：Profile baseline kernel
 

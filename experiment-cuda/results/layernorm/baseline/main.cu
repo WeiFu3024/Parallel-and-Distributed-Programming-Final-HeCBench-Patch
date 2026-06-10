@@ -5,10 +5,255 @@ Kernels for layernorm forward pass.
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
-#include "common.h"
-#include "reference.h"
-#include "utils.cuh"
-#include "reduce.cuh"
+// ---- INLINED: common.h (from /home/WillFu/parallel/final/HeCBench/src/layernorm-cuda/common.h) ----
+#include <cfloat>
+#include <chrono>
+#include <cmath>
+#include <cuda_runtime.h>
+#include <cooperative_groups.h>
+#include <cooperative_groups/reduce.h>
+
+float* make_random_float(size_t N) {
+    float* arr = (float*)malloc(N * sizeof(float));
+    for (size_t i = 0; i < N; i++) {
+        arr[i] = rand() / (float)RAND_MAX * 2.f - 1.f; // range -1..1
+    }
+    return arr;
+}
+
+template<class T>
+__host__ __device__ T ceil_div(T dividend, T divisor) {
+    return (dividend + divisor-1) / divisor;
+}
+
+// ----------------------------------------------------------------------------
+// checking utils
+
+// CUDA error checking
+void cuda_check(cudaError_t error, const char *file, int line) {
+    if (error != cudaSuccess) {
+        printf("[CUDA ERROR] at file %s:%d:\n%s\n", file, line,
+               cudaGetErrorString(error));
+        exit(EXIT_FAILURE);
+    }
+};
+#define cudaCheck(err) (cuda_check(err, __FILE__, __LINE__))
+
+template<class D, class T>
+void validate_result(D* device_result, const T* cpu_reference, const char* name, std::size_t num_elements, T tolerance=1e-4) {
+    D* out_gpu = (D*)malloc(num_elements * sizeof(D));
+    cudaCheck(cudaMemcpy(out_gpu, device_result, num_elements * sizeof(D), cudaMemcpyDeviceToHost));
+    int nfaults = 0;
+#ifndef ENABLE_BF16
+    float epsilon = FLT_EPSILON;
+#else
+    float epsilon = 0.079;
+#endif
+    for (std::size_t i = 0; i < num_elements; i++) {
+        // Skip masked elements
+        if(!std::isfinite(cpu_reference[i]))
+            continue;
+
+        // print the first few comparisons
+        //if (i < 5) { printf("%f %f\n", cpu_reference[i], (T)out_gpu[i]); }
+        
+        // effective tolerance is based on expected rounding error (epsilon),
+        // plus any specified additional tolerance
+        float t_eff = tolerance + fabs(cpu_reference[i]) * epsilon;
+        // ensure correctness for all elements.
+        if (fabs(cpu_reference[i] - (T)out_gpu[i]) > t_eff) {
+            printf("Mismatch of %s at %zu: CPU_ref: %f vs GPU: %f\n", name, i, cpu_reference[i], (T)out_gpu[i]);
+            nfaults ++;
+            if (nfaults >= 10) {
+                free(out_gpu);
+                exit(EXIT_FAILURE);
+            }
+        }
+    }
+
+    if (nfaults > 0) {
+        free(out_gpu);
+        exit(EXIT_FAILURE);
+    }
+
+    free(out_gpu);
+}
+
+template<class Kernel, class... KernelArgs>
+float benchmark_kernel(int repeats, Kernel kernel, KernelArgs&&... kernel_args) {
+    float elapsed_time = 0.f;
+    for (int i = 0; i < repeats; i++) {
+        auto start = std::chrono::high_resolution_clock::now();
+
+        kernel(std::forward<KernelArgs>(kernel_args)...);
+
+        auto stop = std::chrono::high_resolution_clock::now();
+
+        std::chrono::duration<float, std::milli> duration = stop - start;
+        elapsed_time += duration.count();
+    }
+
+    return elapsed_time / repeats;
+}
+
+// ---- END INLINED: common.h ----
+
+// ---- INLINED: reference.h (from /home/WillFu/parallel/final/HeCBench/src/layernorm-cuda/reference.h) ----
+// ----------------------------------------------------------------------------
+// CPU code reference
+
+// GPT-2 layernorm forward pass
+void layernorm_forward_cpu(float* out, float* mean, float* rstd,
+                       const float* inp, const float* weight, const float* bias,
+                       int B, int T, int C) {
+    float eps = 1e-5f;
+    for (int b = 0; b < B; b++) {
+        for (int t = 0; t < T; t++) {
+            // seek to the input position inp[b,t,:]
+            const float* x = inp + b * T * C + t * C;
+            // calculate the mean
+            float m = 0.0f;
+            for (int i = 0; i < C; i++) {
+                m += x[i];
+            }
+            m = m/C;
+            // calculate the variance (without any bias correction)
+            float v = 0.0f;
+            for (int i = 0; i < C; i++) {
+                float xshift = x[i] - m;
+                v += xshift * xshift;
+            }
+            v = v/C;
+            // calculate the rstd
+            float s = 1.0f / sqrtf(v + eps);
+            // seek to the output position in out[b,t,:]
+            float* out_bt = out + b * T * C + t * C;
+            for (int i = 0; i < C; i++) {
+                float n = (s * (x[i] - m)); // normalized output
+                float o = n * weight[i] + bias[i]; // scale and shift it
+                out_bt[i] = o; // write
+            }
+            // cache the mean and rstd for the backward pass later
+            mean[b * T + t] = m;
+            rstd[b * T + t] = s;
+        }
+    }
+}
+
+
+
+// ---- END INLINED: reference.h ----
+
+// ---- INLINED: utils.cuh (from /home/WillFu/parallel/final/HeCBench/src/rmsnorm-cuda/utils.cuh) ----
+// Copyright (c) 2025, Advanced Micro Devices, Inc. All rights reserved.
+//
+// See LICENSE for license information.
+
+#pragma once
+
+/**
+ * Load & Store data utils
+ */
+
+// TODO: ASM
+template <typename T, const int N>
+__device__ void load_data(const T *src, T *dst) {
+    constexpr int BYTES = N * sizeof(T);
+    static_assert(BYTES == 1 || BYTES == 2 || BYTES == 4 || BYTES == 8 || BYTES == 16,
+                  "Only 1/2/4/8/16 bytes are supported.");
+    if constexpr (BYTES == 1) {
+        *reinterpret_cast<uint8_t *>(dst) = *(reinterpret_cast<const uint8_t *>(src));
+    } else if constexpr (BYTES == 2) {
+        *reinterpret_cast<uint16_t *>(dst) = *(reinterpret_cast<const uint16_t *>(src));
+    } else if constexpr (BYTES == 4) {
+        *reinterpret_cast<uint32_t *>(dst) = *(reinterpret_cast<const uint32_t *>(src));
+    } else if constexpr (BYTES == 8) {
+        *reinterpret_cast<uint64_t *>(dst) = *(reinterpret_cast<const uint64_t *>(src));
+    } else if constexpr (BYTES == 16) {
+        *reinterpret_cast<uint4 *>(dst) = *(reinterpret_cast<const uint4 *>(src));
+    }
+}
+
+template <typename T, const int N>
+__device__ void store_data(T *dst, const T *src) {
+    constexpr int BYTES = N * sizeof(T);
+    static_assert(BYTES == 1 || BYTES == 2 || BYTES == 4 || BYTES == 8 || BYTES == 16,
+                  "Only 1/2/4/8/16 bytes are supported.");
+
+    if constexpr (BYTES == 1) {
+        *reinterpret_cast<uint8_t *>(dst) = *reinterpret_cast<const uint8_t *>(src);
+    } else if constexpr (BYTES == 2) {
+        *reinterpret_cast<uint16_t *>(dst) = *reinterpret_cast<const uint16_t *>(src);
+    } else if constexpr (BYTES == 4) {
+        *reinterpret_cast<uint32_t *>(dst) = *reinterpret_cast<const uint32_t *>(src);
+    } else if constexpr (BYTES == 8) {
+        *reinterpret_cast<uint64_t *>(dst) = *reinterpret_cast<const uint64_t *>(src);
+    } else if constexpr (BYTES == 16) {
+        *reinterpret_cast<uint4 *>(dst) = *reinterpret_cast<const uint4 *>(src);
+    }
+}
+
+// ---- END INLINED: utils.cuh ----
+
+// ---- INLINED: reduce.cuh (from /home/WillFu/parallel/final/HeCBench/src/rmsnorm-cuda/reduce.cuh) ----
+// Copyright (c) 2025, Advanced Micro Devices, Inc. All rights reserved.
+//
+// See LICENSE for license information.
+
+#pragma once
+
+#define FINAL_MASK 0xffffffff
+#define MAX_THREADS_PER_BLOCK 1024
+#define THREADS_PER_WARP 32
+
+// Sum
+template <typename T> struct SumOp {
+    __device__ static T init() { return T(0); }
+    __device__ static T op(const T &x, const T &y) { return x + y; }
+};
+
+
+/**
+ * Warp Reduce and Block Reduce
+ */
+template <template <class> class Func, typename T>
+__device__  T WarpReduce(T val) {
+#pragma unroll
+    for (int offset = THREADS_PER_WARP >> 1; offset > 0; offset >>= 1) {
+        T tmp = __shfl_xor_sync(FINAL_MASK, val, offset);
+        val   = Func<T>::op(tmp, val);
+    }
+    return val;
+}
+
+template <template <class> class Func, typename T>
+__device__ T BlockReduce(const T &val) {
+    constexpr int MAX_NUM_WARPS = MAX_THREADS_PER_BLOCK / THREADS_PER_WARP;
+    const int     num_warps     = (blockDim.x + THREADS_PER_WARP - 1) / THREADS_PER_WARP;
+
+    __shared__ T smem[MAX_NUM_WARPS];
+    const int    warp_id = threadIdx.x / THREADS_PER_WARP;
+    const int    lane_id = threadIdx.x % THREADS_PER_WARP;
+
+    T val_reg = Func<T>::init();
+    val_reg   = Func<T>::op(val_reg, val);
+    val_reg   = WarpReduce<Func, T>(val_reg);
+    if (lane_id == 0) {
+        smem[warp_id] = val_reg;
+    }
+    __syncthreads();
+    if (warp_id == 0) {
+        val_reg = (lane_id < num_warps) ? smem[lane_id] : Func<T>::init();
+        val_reg = WarpReduce<Func, T>(val_reg);
+        if (lane_id == 0)
+            smem[0] = val_reg;
+    }
+    __syncthreads();
+    return smem[0];
+}
+
+// ---- END INLINED: reduce.cuh ----
+
 
 template <int UNROLL>
 __global__

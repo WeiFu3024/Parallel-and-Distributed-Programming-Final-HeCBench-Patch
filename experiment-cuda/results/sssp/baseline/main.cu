@@ -44,10 +44,323 @@
 #include <cuda.h>
 
 // Local dep includes (kept as separate dep files)
-#include "kernel.h"
-#include "support/common.h"
-#include "support/timer.h"
-#include "support/verify.h"
+// ---- INLINED: kernel.h (from /home/WillFu/parallel/final/HeCBench/src/sssp-cuda/kernel.h) ----
+/*
+ * Copyright (c) 2016 University of Cordoba and University of Illinois
+ * All rights reserved.
+ *
+ * Developed by:    IMPACT Research Group
+ *                  University of Cordoba and University of Illinois
+ *                  http://impact.crhc.illinois.edu/
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * with the Software without restriction, including without limitation the 
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ *      > Redistributions of source code must retain the above copyright notice,
+ *        this list of conditions and the following disclaimers.
+ *      > Redistributions in binary form must reproduce the above copyright
+ *        notice, this list of conditions and the following disclaimers in the
+ *        documentation and/or other materials provided with the distribution.
+ *      > Neither the names of IMPACT Research Group, University of Cordoba, 
+ *        University of Illinois nor the names of its contributors may be used 
+ *        to endorse or promote products derived from this Software without 
+ *        specific prior written permission.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE 
+ * CONTRIBUTORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS WITH
+ * THE SOFTWARE.
+ *
+ */
+
+#include <atomic>
+// ---- INLINED: support/common.h (from /home/WillFu/parallel/final/HeCBench/src/sssp-cuda/support/common.h) ----
+/*
+ * Copyright (c) 2016 University of Cordoba and University of Illinois
+ * All rights reserved.
+ *
+ * Developed by:    IMPACT Research Group
+ *                  University of Cordoba and University of Illinois
+ *                  http://impact.crhc.illinois.edu/
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * with the Software without restriction, including without limitation the 
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ *      > Redistributions of source code must retain the above copyright notice,
+ *        this list of conditions and the following disclaimers.
+ *      > Redistributions in binary form must reproduce the above copyright
+ *        notice, this list of conditions and the following disclaimers in the
+ *        documentation and/or other materials provided with the distribution.
+ *      > Neither the names of IMPACT Research Group, University of Cordoba, 
+ *        University of Illinois nor the names of its contributors may be used 
+ *        to endorse or promote products derived from this Software without 
+ *        specific prior written permission.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE 
+ * CONTRIBUTORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS WITH
+ * THE SOFTWARE.
+ *
+ */
+
+#ifndef _COMMON_H_
+#define _COMMON_H_
+
+#define PRINT 0
+#define PRINT_ALL 0
+
+#define INF -2147483647
+#define UP_LIMIT 16677216 //2^24
+#define WHITE 16677217
+#define GRAY 16677218
+#define GRAY0 16677219
+#define GRAY1 16677220
+#define BLACK 16677221
+#define W_QUEUE_SIZE 1600
+
+typedef struct {
+    int x;
+    int y;
+} Node;
+typedef struct {
+    int x;
+    int y;
+} Edge;
+
+#endif
+
+// ---- END INLINED: support/common.h ----
+
+
+void run_cpu_threads(Node *graph_nodes_av, Edge *graph_edges_av, std::atomic_int *cost, std::atomic_int *color,
+    int *q1, int *q2, int *n_t, std::atomic_int *head, std::atomic_int *tail,
+    std::atomic_int *threads_end, std::atomic_int *threads_run, std::atomic_int *gray_shade,
+    std::atomic_int *iter, int cpu_threads, int LIMIT, const int GPU);
+
+// ---- END INLINED: kernel.h ----
+
+// [merge] skipped duplicate include "support/common.h"
+// ---- INLINED: support/timer.h (from /home/WillFu/parallel/final/HeCBench/src/sssp-cuda/support/timer.h) ----
+/*
+ * Copyright (c) 2016 University of Cordoba and University of Illinois
+ * All rights reserved.
+ *
+ * Developed by:    IMPACT Research Group
+ *                  University of Cordoba and University of Illinois
+ *                  http://impact.crhc.illinois.edu/
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * with the Software without restriction, including without limitation the 
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ *      > Redistributions of source code must retain the above copyright notice,
+ *        this list of conditions and the following disclaimers.
+ *      > Redistributions in binary form must reproduce the above copyright
+ *        notice, this list of conditions and the following disclaimers in the
+ *        documentation and/or other materials provided with the distribution.
+ *      > Neither the names of IMPACT Research Group, University of Cordoba, 
+ *        University of Illinois nor the names of its contributors may be used 
+ *        to endorse or promote products derived from this Software without 
+ *        specific prior written permission.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE 
+ * CONTRIBUTORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS WITH
+ * THE SOFTWARE.
+ *
+ */
+
+#include <chrono>
+#include <iostream>
+#include <map>
+#include <string>
+
+struct Timer {
+
+  std::map<const std::string, std::chrono::steady_clock::time_point> startTime;
+  std::map<const std::string, std::chrono::steady_clock::time_point> stopTime;
+  std::map<const std::string, double> time;
+
+  void start(const std::string &name) {
+    if(!time.count(name)) {
+      time[name] = 0.0;
+    }
+    startTime[name] = std::chrono::steady_clock::now();
+  }
+
+  void stop(const std::string &name) {
+    stopTime[name] = std::chrono::steady_clock::now();
+    float part_time = std::chrono::duration_cast<std::chrono::nanoseconds>(stopTime[name] - startTime[name]).count();
+    time[name] += part_time;
+  }
+
+  void print(const std::string &name, const unsigned int REP) {
+    printf("%s time (ms): %f\n", name.c_str(), time[name] * 1e-6f / REP);
+  }
+};
+
+
+// ---- END INLINED: support/timer.h ----
+
+// ---- INLINED: support/verify.h (from /home/WillFu/parallel/final/HeCBench/src/sssp-cuda/support/verify.h) ----
+/*
+ * Copyright (c) 2016 University of Cordoba and University of Illinois
+ * All rights reserved.
+ *
+ * Developed by:    IMPACT Research Group
+ *                  University of Cordoba and University of Illinois
+ *                  http://impact.crhc.illinois.edu/
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * with the Software without restriction, including without limitation the 
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ *      > Redistributions of source code must retain the above copyright notice,
+ *        this list of conditions and the following disclaimers.
+ *      > Redistributions in binary form must reproduce the above copyright
+ *        notice, this list of conditions and the following disclaimers in the
+ *        documentation and/or other materials provided with the distribution.
+ *      > Neither the names of IMPACT Research Group, University of Cordoba, 
+ *        University of Illinois nor the names of its contributors may be used 
+ *        to endorse or promote products derived from this Software without 
+ *        specific prior written permission.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE 
+ * CONTRIBUTORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS WITH
+ * THE SOFTWARE.
+ *
+ */
+// ---- INLINED: common.h (from /home/WillFu/parallel/final/HeCBench/src/sssp-cuda/support/common.h) ----
+/*
+ * Copyright (c) 2016 University of Cordoba and University of Illinois
+ * All rights reserved.
+ *
+ * Developed by:    IMPACT Research Group
+ *                  University of Cordoba and University of Illinois
+ *                  http://impact.crhc.illinois.edu/
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * with the Software without restriction, including without limitation the 
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ *      > Redistributions of source code must retain the above copyright notice,
+ *        this list of conditions and the following disclaimers.
+ *      > Redistributions in binary form must reproduce the above copyright
+ *        notice, this list of conditions and the following disclaimers in the
+ *        documentation and/or other materials provided with the distribution.
+ *      > Neither the names of IMPACT Research Group, University of Cordoba, 
+ *        University of Illinois nor the names of its contributors may be used 
+ *        to endorse or promote products derived from this Software without 
+ *        specific prior written permission.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE 
+ * CONTRIBUTORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS WITH
+ * THE SOFTWARE.
+ *
+ */
+
+#ifndef _COMMON_H_
+#define _COMMON_H_
+
+#define PRINT 0
+#define PRINT_ALL 0
+
+#define INF -2147483647
+#define UP_LIMIT 16677216 //2^24
+#define WHITE 16677217
+#define GRAY 16677218
+#define GRAY0 16677219
+#define GRAY1 16677220
+#define BLACK 16677221
+#define W_QUEUE_SIZE 1600
+
+typedef struct {
+    int x;
+    int y;
+} Node;
+typedef struct {
+    int x;
+    int y;
+} Edge;
+
+#endif
+
+// ---- END INLINED: common.h ----
+
+
+inline bool verify(std::atomic_int *h_cost, int num_of_nodes, const char *file_name) {
+  // Compare to output file
+#if PRINT
+  printf("Comparing outputs...\n");
+#endif
+  FILE *fpo = fopen(file_name, "r");
+  if(!fpo) {
+    printf("Error Reading output file\n");
+    return false;
+  }
+#if PRINT
+  printf("Reading Output: %s\n", file_name);
+#endif
+
+  // the number of nodes in the output
+  int num_of_nodes_o = 0;
+  fscanf(fpo, "%d", &num_of_nodes_o);
+  if(num_of_nodes != num_of_nodes_o) {
+    printf("FAIL: Number of nodes does not match the expected value\n");
+    return false;
+  }
+
+  // cost of nodes in the output
+  for(int i = 0; i < num_of_nodes_o; i++) {
+    int j, cost;
+    fscanf(fpo, "%d %d", &j, &cost);
+    if(i != j || h_cost[i].load() * -1 != cost) {
+      printf("FAIL: Computed node %d cost (%d != %d) does not match the expected value\n",
+             i, h_cost[i].load(), cost);
+      return false;
+    }
+  }
+
+  fclose(fpo);
+  return true;
+}
+
+// ---- END INLINED: support/verify.h ----
+
 
 // ---- kernel.cu body (inlined; weak to avoid duplicate symbols when
 //      compile.sh also compiles kernel.cu as a separate TU) ----

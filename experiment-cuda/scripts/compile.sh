@@ -91,22 +91,22 @@ case "${BENCHMARK}" in
     EXTRA_NVCC_FLAGS=()
     ;;
   aes)
-    # kernels.cu / reference.cu / utils.cu are #include'd directly by main.cu
-    EXTRA_DEPS=("aes.h" "kernels.cu" "reference.cu" "utils.cu")
+    # Merged: SDKBitMap.h, aes.h, kernels.cu, reference.cu, utils.cu inlined into main.cu
+    EXTRA_DEPS=()
     EXTRA_DIRS=()
     EXTRA_SRCS=()
-    EXTRA_NVCC_FLAGS=("-I${HECBENCH_PATH}/src/include")
+    EXTRA_NVCC_FLAGS=()
     ;;
   attention)
-    EXTRA_DEPS=("kernels.h" "reference.h")
+    # Merged: kernels.h, reference.h inlined into main.cu
+    EXTRA_DEPS=()
     EXTRA_DIRS=()
     EXTRA_SRCS=()
     EXTRA_NVCC_FLAGS=()
     ;;
   attention-paged)
-    EXTRA_DEPS=("attention_dtypes.h" "attention_generic.cuh" "attention_kernels.cuh"
-                "attention_utils.cuh" "cuda_compat.h" "dtype_bfloat16.cuh"
-                "dtype_float32.cuh" "kvcache.h" "reference.h")
+    # Merged: all attention *.cuh/*.h sources inlined into main.cu
+    EXTRA_DEPS=()
     EXTRA_DIRS=()
     EXTRA_SRCS=()
     EXTRA_NVCC_FLAGS=()
@@ -138,13 +138,8 @@ case "${BENCHMARK}" in
     EXTRA_NVCC_FLAGS=()
     ;;
   black-scholes)
-    # All extra .cu files are #include'd textually by main.cu
-    EXTRA_DEPS=("blackScholesAnalyticEngineKernels.cu"
-                "blackScholesAnalyticEngineKernelsCpu.cu"
-                "blackScholesAnalyticEngineStructs.cuh"
-                "blackScholesAnalyticEngineKernels.cuh"
-                "blackScholesAnalyticEngineKernelsCpu.cuh"
-                "errorFunctConsts.cuh")
+    # Merged: all black-scholes kernel/struct sources inlined into main.cu
+    EXTRA_DEPS=()
     EXTRA_DIRS=()
     EXTRA_SRCS=()
     EXTRA_NVCC_FLAGS=()
@@ -174,7 +169,8 @@ case "${BENCHMARK}" in
     EXTRA_NVCC_FLAGS=()
     ;;
   fft)
-    EXTRA_DEPS=("fft1D_512.h" "ifft1D_512.h" "reference.h")
+    # Merged: fft1D_512.h, ifft1D_512.h, reference.h inlined into main.cu
+    EXTRA_DEPS=()
     EXTRA_DIRS=()
     EXTRA_SRCS=()
     EXTRA_NVCC_FLAGS=()
@@ -202,14 +198,15 @@ case "${BENCHMARK}" in
                      "-lm")
     ;;
   histogram)
-    EXTRA_DEPS=("histogram_gmem_atomics.h" "histogram_smem_atomics.h"
-                "mersenne.h" "test_util.h")
+    # Merged: histogram + test_util headers inlined into main.cu
+    EXTRA_DEPS=()
     EXTRA_DIRS=()
     EXTRA_SRCS=()
     EXTRA_NVCC_FLAGS=()
     ;;
   hotspot)
-    EXTRA_DEPS=("hotspot.h" "kernel.h")
+    # Merged: hotspot.h, kernel.h inlined into main.cu
+    EXTRA_DEPS=()
     EXTRA_DIRS=()
     EXTRA_SRCS=()
     EXTRA_NVCC_FLAGS=()
@@ -221,12 +218,11 @@ case "${BENCHMARK}" in
     EXTRA_NVCC_FLAGS=()
     ;;
   layernorm)
-    # layernorm-cuda has its own common.h and reference.h (different from rmsnorm-cuda's).
-    # reduce.cuh and utils.cuh come from rmsnorm-cuda via -I.
-    EXTRA_DEPS=("common.h" "reference.h")
+    # Merged: common.h, reference.h, utils.cuh, reduce.cuh inlined into main.cu
+    EXTRA_DEPS=()
     EXTRA_DIRS=()
     EXTRA_SRCS=()
-    EXTRA_NVCC_FLAGS=("-I${HECBENCH_PATH}/src/rmsnorm-cuda")
+    EXTRA_NVCC_FLAGS=()
     ;;
   lzss)
     EXTRA_DEPS=("utils.h")
@@ -285,15 +281,16 @@ case "${BENCHMARK}" in
     EXTRA_NVCC_FLAGS=()
     ;;
   sort)
-    EXTRA_DEPS=("sort_bottom_scan.h" "sort_reduce.h" "sort_top_scan.h")
+    # Merged: sort_*.h headers inlined into main.cu
+    EXTRA_DEPS=()
     EXTRA_DIRS=()
     EXTRA_SRCS=()
     EXTRA_NVCC_FLAGS=()
     ;;
   sssp)
-    # Merged: kernel.cu inlined into main.cu (single-file baseline); kernel.h kept as dep
-    EXTRA_DEPS=("kernel.h")
-    EXTRA_DIRS=("support")
+    # Merged: kernel.cu, kernel.h, support/*.h inlined into main.cu
+    EXTRA_DEPS=()
+    EXTRA_DIRS=()
     EXTRA_SRCS=()
     EXTRA_NVCC_FLAGS=("-lpthread")
     ;;

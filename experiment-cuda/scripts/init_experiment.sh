@@ -58,7 +58,8 @@ for bench in "${BENCHMARKS[@]}"; do
 
   # --- Benchmarks whose baseline/main.cu is hand-merged and must not be overwritten ---
   case "${bench}" in
-    binomial|fluidSim|heartwall|mcpr|sc|sssp)
+    aes|attention|attention-paged|binomial|black-scholes|convolution3D|
+    fft|fluidSim|heartwall|histogram|hotspot|layernorm|mcpr|sc|sort|sssp)
       MERGED_BASELINE=true ;;
     *)
       MERGED_BASELINE=false ;;
@@ -112,6 +113,6 @@ echo "  1. bash scripts/hardware_spec.sh > ${EXPERIMENT_DIR}/config/hardware_spe
 echo "  2. system_prompt.txt already exists at ${EXPERIMENT_DIR}/config/system_prompt.txt"
 echo "  3. Profile each baseline: ncu --set full --csv ... > results/{bench}/baseline/nsight_raw.csv"
 echo "  4. Generate context.xml for each benchmark (analysis LLM)"
-echo "  NOTE: binomial, fluidSim, heartwall, mcpr, sc, sssp need hand-merged baseline/main.cu"
+echo "  NOTE: merged baselines (see operations_manual_cuda.md Step 0.2) must not be overwritten by init"
 echo ""
 echo "Done."
